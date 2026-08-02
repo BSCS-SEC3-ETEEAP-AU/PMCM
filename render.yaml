@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: pmcm-thesis
+    runtime: python
+    plan: free
+    region: ap-southeast-1
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn run:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
