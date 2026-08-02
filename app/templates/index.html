@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>A Smart Project Management &amp; Employee Competency Development Platform</h1>
+  <p class="lead">For Hybrid Software Development Teams — integrating project coordination,
+     competency management, rule-based learning recommendations, and managerial reporting
+     into one centralized web platform.</p>
+  <a class="btn primary" href="{{ url_for('auth.login') }}">Login to Platform</a>
+  <div class="hero-modules">
+    <div class="hm">📁 Project Management</div>
+    <div class="hm">🧠 Competency Development</div>
+    <div class="hm">🎯 Learning Recommendations</div>
+    <div class="hm">📊 Reports &amp; Dashboard</div>
+  </div>
+  <p class="thesis-note">Thesis · BS Computer Science (ETEEAP), Arellano University · Beneficiary: IT Architecture &amp; Data Engineering Dept., The Medical City</p>
+</section>
+{% endblock %}

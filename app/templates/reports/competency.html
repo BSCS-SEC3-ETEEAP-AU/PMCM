@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Competency Report</h2>
+<form class="inline-form" method="GET" action="{{ url_for('reports.competency_report') }}">
+  <select name="team">
+    <option value="">— All Teams —</option>
+    {% for t in teams %}<option {% if selected_team==t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+  </select>
+  <button class="btn primary" type="submit">Generate</button>
+</form>
+<table class="data-table">
+  <thead><tr><th>Employee</th><th>Team</th><th>Position</th><th>Assessed</th><th>Gaps</th><th>Coverage</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td>{{ r.employee }}</td><td>{{ r.team }}</td><td>{{ r.position }}</td>
+      <td>{{ r.assessed }}</td><td>{{ r.gaps }}</td>
+      <td><div class="bar"><span style="width:{{ r.coverage }}%"></span></div>{{ r.coverage }}%</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Competency Assessment — {{ emp.full_name }}</h2>
+<p class="muted">Set current proficiency (1–5) and required level (1–5) per skill. The system computes gaps for the recommendation engine.</p>
+<form method="POST" action="{{ url_for('competency.assess', employee_id=emp.id) }}">
+  <table class="data-table">
+    <thead><tr><th>Skill</th><th>Category</th><th>Current (1–5)</th><th>Required (1–5)</th><th>Notes</th></tr></thead>
+    <tbody>
+    {% for s in skills %}
+      {% set a = assessments | selectattr('skill_id','equalto', s.id) | first %}
+      <tr>
+        <td>{{ s.name }}</td><td>{{ s.category }}</td>
+        <td><input type="number" name="current_{{ s.id }}" min="1" max="5" value="{{ a.current_level if a else 1 }}" class="num"></td>
+        <td><input type="number" name="required_{{ s.id }}" min="1" max="5" value="{{ a.required_level if a else 3 }}" class="num"></td>
+        <td><input type="text" name="notes_{{ s.id }}" value="{% if a %}{{ a.notes }}{% endif %}" placeholder="—"></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <button class="btn primary" type="submit">Save Assessment</button>
+</form>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Reports &amp; Dashboard</h2>
+<div class="card-grid">
+  <a class="proj-card" href="{{ url_for('reports.project_status') }}">
+    <div class="proj-title">📁 Project Status Report</div>
+    <div class="proj-desc">Progress, task counts, and status breakdown per project.</div>
+  </a>
+  <a class="proj-card" href="{{ url_for('reports.competency_report') }}">
+    <div class="proj-title">🧠 Competency Report</div>
+    <div class="proj-desc">Coverage and skill gaps by employee and team.</div>
+  </a>
+  <a class="proj-card" href="{{ url_for('main.dashboard') }}">
+    <div class="proj-title">📊 Executive Dashboard</div>
+    <div class="proj-desc">KPIs, task distribution, and team coverage.</div>
+  </a>
+</div>
+{% endblock %}

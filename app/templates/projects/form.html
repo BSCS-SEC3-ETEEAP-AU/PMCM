@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Create Project</h2>
+<form class="form-card" method="POST" action="{{ url_for('projects.create_project') }}">
+  <label>Project Name
+    <input type="text" name="name" required>
+  </label>
+  <label>Description
+    <textarea name="description" rows="3"></textarea>
+  </label>
+  <label>Status
+    <select name="status">
+      <option>Active</option><option>On Hold</option><option>Completed</option>
+    </select>
+  </label>
+  <div class="row-2">
+    <label>Start Date <input type="date" name="start_date"></label>
+    <label>Target Date <input type="date" name="target_date"></label>
+  </div>
+  <fieldset>
+    <legend>Team Members</legend>
+    <div class="check-grid">
+      {% for e in employees %}
+      <label class="chk"><input type="checkbox" name="members" value="{{ e.id }}"> {{ e.full_name }} <small>({{ e.team }})</small></label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  <button class="btn primary" type="submit">Create Project</button>
+</form>
+{% endblock %}

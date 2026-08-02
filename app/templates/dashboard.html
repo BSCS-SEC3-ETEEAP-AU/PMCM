@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Dashboard</h2>
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-num">{{ active_projects }}</div><div class="kpi-label">Active Projects</div></div>
+  <div class="kpi"><div class="kpi-num">{{ total_employees }}</div><div class="kpi-label">Employees</div></div>
+  <div class="kpi"><div class="kpi-num">{{ open_tasks }}</div><div class="kpi-label">Open Tasks</div></div>
+  <div class="kpi"><div class="kpi-num">{{ pending_recs }}</div><div class="kpi-label">Pending Recs</div></div>
+  <div class="kpi"><div class="kpi-num">{{ coverage }}%</div><div class="kpi-label">Competency Coverage</div></div>
+</div>
+
+<div class="dash-grid">
+  <div class="card">
+    <h3>Task Status Distribution</h3>
+    <canvas id="taskChart" width="320" height="220"></canvas>
+  </div>
+  <div class="card">
+    <h3>Competency Coverage by Team</h3>
+    <table class="data-table">
+      <thead><tr><th>Team</th><th>Employees</th><th>Coverage</th></tr></thead>
+      <tbody>
+      {% for t in team_coverage %}
+        <tr><td>{{ t.team }}</td><td>{{ t.employees }}</td>
+            <td>
+              <div class="bar"><span style="width:{{ t.coverage }}%"></span></div>
+              {{ t.coverage }}%
+            </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script>
+  const taskDist = {{ task_dist | tojson }};
+  drawTaskChart('taskChart', taskDist);
+</script>
+{% endblock %}

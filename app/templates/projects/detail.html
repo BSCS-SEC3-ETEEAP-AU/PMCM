@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row-between">
+  <h2>{{ project.name }}</h2>
+  <span class="status-pill status-{{ project.status|lower|replace(' ','') }}">{{ project.status }}</span>
+</div>
+<p class="muted">Manager: {{ project.manager.full_name }} · Progress: {{ progress }}%</p>
+<div class="progress-bar"><span style="width:{{ progress }}%"></span></div>
+
+<div class="dash-grid">
+  <div class="card">
+    <h3>Tasks (Kanban-style board)</h3>
+    <div class="board">
+      {% for st in statuses %}
+      <div class="board-col">
+        <div class="board-head">{{ st }} <small>({{ tasks|selectattr('status','equalto',st)|list|length }})</small></div>
+        {% for t in tasks if t.status == st %}
+        <div class="ticket">
+          <div class="t-title">{{ t.title }}</div>
+          <div class="t-meta">
+            <span class="prio prio-{{ t.priority|lower }}">{{ t.priority }}</span>
+            {% if t.assignee %}<span>{{ t.assignee.full_name }}</span>{% endif %}
+          </div>
+          {% if current_user.role == 'employee' %}
+            {% set my_emp = none %}
+          {% endif %}
+          {% if current_user.role in ('admin','manager') or (current_user.role=='employee') %}
+          <form method="POST" action="{{ url_for('projects.update_task', task_id=t.id) }}">
+            <select name="status" onchange="this.form.submit()">
+              {% for s in statuses %}<option {% if s==t.status %}selected{% endif %}>{{ s }}</option>{% endfor %}
+            </select>
+          </form>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if current_user.role in ('admin','manager') %}
+    <form class="inline-form" method="POST" action="{{ url_for('projects.create_task', project_id=project.id) }}">
+      <input type="text" name="title" placeholder="New task title" required>
+      <select name="assignee_id">
+        <option value="">— Assignee —</option>
+        {% for e in employees %}<option value="{{ e.id }}">{{ e.full_name }}</option>{% endfor %}
+      </select>
+      <select name="status">
+        {% for s in statuses %}<option>{{ s }}</option>{% endfor %}
+      </select>
+      <select name="priority">
+        <option>Low</option><option selected>Medium</option><option>High</option>
+      </select>
+      <select name="required_skill_id">
+        <option value="">— Skill —</option>
+        {% for s in skills %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+      </select>
+      <input type="number" name="required_level" value="3" min="1" max="5" title="Required level">
+      <input type="date" name="due_date">
+      <button class="btn primary" type="submit">Add Task</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3>Team ({{ members|length }})</h3>
+    <ul class="member-list">
+      {% for m in members %}<li>{{ m.full_name }} <small>· {{ m.position }} · {{ m.work_mode }}</small></li>{% endfor %}
+    </ul>
+    <h3>Milestones</h3>
+    <ul class="milestone-list">
+      {% for ms in milestones %}
+      <li class="{% if ms.achieved %}done{% endif %}">{{ ms.title }} <small>· {{ ms.due_date }}</small></li>
+      {% endfor %}
+    </ul>
+    {% if current_user.role in ('admin','manager') %}
+    <form class="inline-form" method="POST" action="{{ url_for('projects.create_milestone', project_id=project.id) }}">
+      <input type="text" name="title" placeholder="Milestone title" required>
+      <input type="date" name="due_date">
+      <button class="btn" type="submit">Add</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

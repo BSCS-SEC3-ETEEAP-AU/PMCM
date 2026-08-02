@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Skills Catalog</h2>
+<table class="data-table">
+  <thead><tr><th>Skill</th><th>Category</th><th>Description</th></tr></thead>
+  <tbody>
+  {% for s in skills %}
+    <tr><td>{{ s.name }}</td><td>{{ s.category }}</td><td>{{ s.description }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<form class="form-card" method="POST" action="{{ url_for('competency.add_skill') }}">
+  <h3>Add Skill</h3>
+  <label>Name <input type="text" name="name" required></label>
+  <label>Category
+    <select name="category"><option>Technical</option><option>Soft</option><option>Domain</option></select>
+  </label>
+  <label>Description <input type="text" name="description"></label>
+  <button class="btn primary" type="submit">Add</button>
+</form>
+{% endblock %}

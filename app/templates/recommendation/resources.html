@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Learning Resource Repository</h2>
+<table class="data-table">
+  <thead><tr><th>Title</th><th>Type</th><th>Skill</th><th>Builds to Lvl</th><th>Description</th></tr></thead>
+  <tbody>
+  {% for r in resources %}
+    <tr><td>{{ r.title }}</td><td>{{ r.resource_type }}</td><td>{{ r.skill.name }}</td>
+        <td>{{ r.target_level }}</td><td>{{ r.description }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<form class="form-card" method="POST" action="{{ url_for('recommendation.add_resource') }}">
+  <h3>Add Learning Resource</h3>
+  <label>Title <input type="text" name="title" required></label>
+  <label>Type
+    <select name="resource_type"><option>Course</option><option>Article</option><option>Certification</option></select>
+  </label>
+  <label>Skill
+    <select name="skill_id">{% for s in skills %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select>
+  </label>
+  <label>Builds to Level <input type="number" name="target_level" min="1" max="5" value="3"></label>
+  <label>Description <input type="text" name="description"></label>
+  <label>URL <input type="text" name="url"></label>
+  <button class="btn primary" type="submit">Add</button>
+</form>
+{% endblock %}

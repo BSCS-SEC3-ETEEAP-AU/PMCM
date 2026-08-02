@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row-between">
+  <h2>Projects</h2>
+  {% if current_user.role in ('admin','manager') %}
+  <a class="btn primary" href="{{ url_for('projects.create_project') }}">+ New Project</a>
+  {% endif %}
+</div>
+<div class="card-grid">
+  {% for p in projects %}
+  <a class="proj-card" href="{{ url_for('projects.detail', project_id=p.id) }}">
+    <div class="proj-title">{{ p.name }}</div>
+    <div class="proj-meta">
+      <span class="status-pill status-{{ p.status|lower|replace(' ','') }}">{{ p.status }}</span>
+      <span>👤 {{ p.manager.full_name }}</span>
+    </div>
+    <div class="proj-desc">{{ p.description[:90] }}{% if p.description|length > 90 %}…{% endif %}</div>
+  </a>
+  {% else %}
+  <p class="muted">No projects assigned to you yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}

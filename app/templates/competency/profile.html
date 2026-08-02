@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row-between">
+  <h2>{{ emp.full_name }}</h2>
+  <span class="muted">{{ emp.position }} · {{ emp.team }} · {{ emp.work_mode }}</span>
+</div>
+
+<div class="dash-grid">
+  <div class="card">
+    <h3>Competency Assessment</h3>
+    <table class="data-table">
+      <thead><tr><th>Skill</th><th>Current</th><th>Required</th><th>Gap</th></tr></thead>
+      <tbody>
+      {% for a in assessments %}
+        <tr>
+          <td>{{ a.skill.name }}</td>
+          <td>{{ a.current_level }} ({{ a.skill.category }})</td>
+          <td>{{ a.required_level }}</td>
+          <td>{% if a.gap > 0 %}<span class="gap-badge">{{ a.gap }}</span>{% else %}—{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <a class="btn primary" href="{{ url_for('competency.assess', employee_id=emp.id) }}">Update Assessment</a>
+  </div>
+
+  <div class="card">
+    <h3>Certifications</h3>
+    <ul class="cert-list">
+      {% for c in certs %}
+      <li><strong>{{ c.name }}</strong> <small>· {{ c.issuer }} · {{ c.issued_date }}</small></li>
+      {% else %}<li class="muted">No certifications recorded.</li>{% endfor %}
+    </ul>
+    <form class="inline-form" method="POST" action="{{ url_for('competency.add_cert', employee_id=emp.id) }}">
+      <input type="text" name="name" placeholder="Certification name" required>
+      <input type="text" name="issuer" placeholder="Issuer">
+      <input type="date" name="issued_date" title="Issued">
+      <button class="btn" type="submit">Add</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

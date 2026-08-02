@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Competency Gap Analysis (Org-wide)</h2>
+<p class="muted">Current vs required proficiency across all assessments. Sorted by largest gap first — feeds the recommendation engine.</p>
+<table class="data-table">
+  <thead><tr><th>Employee</th><th>Team</th><th>Skill</th><th>Current</th><th>Required</th><th>Gap</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td>{{ r.employee }}</td><td>{{ r.team }}</td><td>{{ r.skill }}</td>
+      <td>{{ r.current }}</td><td>{{ r.required }}</td>
+      <td>{% if r.gap > 0 %}<span class="gap-badge">{{ r.gap }}</span>{% else %}—{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

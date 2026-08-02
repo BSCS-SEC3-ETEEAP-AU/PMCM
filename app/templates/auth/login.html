@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="auth-wrap">
+  <form class="auth-card" method="POST" action="{{ url_for('auth.login') }}">
+    <h2>Sign In</h2>
+    <p class="muted">Role-based access: Administrator · Manager · Employee</p>
+    <label>Username
+      <input type="text" name="username" required autofocus>
+    </label>
+    <label>Password
+      <input type="password" name="password" required>
+    </label>
+    <button class="btn primary" type="submit">Login</button>
+    <div class="demo-creds">
+      <strong>Demo accounts</strong> (password: <code>password123</code>)<br>
+      admin · mgr_gueco · mgr_buban
+    </div>
+  </form>
+</section>
+{% endblock %}

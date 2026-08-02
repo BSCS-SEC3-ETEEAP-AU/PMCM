@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Project Status Report</h2>
+<form class="inline-form" method="GET" action="{{ url_for('reports.project_status') }}">
+  <select name="project_id">
+    <option value="">— All Projects —</option>
+    {% for p in projects %}<option value="{{ p.id }}" {% if selected and selected.id==p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
+  </select>
+  <button class="btn primary" type="submit">Generate</button>
+</form>
+<table class="data-table">
+  <thead><tr><th>Project</th><th>Status</th><th>Tasks</th><th>Done</th><th>Progress</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td>{{ r.project }}</td>
+      <td><span class="status-pill status-{{ r.status|lower|replace(' ','') }}">{{ r.status }}</span></td>
+      <td>{{ r.total_tasks }}</td><td>{{ r.done }}</td>
+      <td><div class="bar"><span style="width:{{ r.progress }}%"></span></div>{{ r.progress }}%</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Smart PM & Competency Platform{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  {% if current_user.is_authenticated %}
+  <header class="topbar">
+    <div class="brand">⚡ SmartPM<span class="sub">· TMC Hybrid Teams</span></div>
+    <nav>
+      <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
+      <a href="{{ url_for('projects.list_projects') }}">Projects</a>
+      <a href="{{ url_for('competency.list_employees') }}">Competency</a>
+      <a href="{{ url_for('recommendation.my_recommendations') }}">Learning</a>
+      {% if current_user.role in ('admin','manager') %}
+      <a href="{{ url_for('reports.index') }}">Reports</a>
+      {% endif %}
+      {% if current_user.role == 'admin' %}
+      <a href="{{ url_for('auth.accounts') }}">Accounts</a>
+      {% endif %}
+    </nav>
+    <div class="userbox">
+      <span class="role-badge role-{{ current_user.role }}">{{ current_user.role.title() }}</span>
+      <span class="uname">{{ current_user.full_name }}</span>
+      <a href="{{ url_for('auth.logout') }}" class="logout">Logout</a>
+    </div>
+  </header>
+  {% endif %}
+
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for cat, msg in messages %}
+          <div class="flash flash-{{ cat }}">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    BS CS Thesis · Arellano University (ETEEAP) · IT Architecture & Data Engineering Dept., The Medical City
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row-between">
+  <h2>{% if own %}My Learning Recommendations{% else %}All Learning Recommendations{% endif %}</h2>
+  {% if current_user.role in ('admin','manager') %}
+  <form method="POST" action="{{ url_for('recommendation.generate') }}" style="display:inline">
+    <button class="btn primary" type="submit">⚙ Run Recommendation Engine</button>
+  </form>
+  {% endif %}
+</div>
+<p class="muted">Rule-based: compares each employee's competency gap against the Learning Resource Repository and recommends resources that build the missing proficiency.</p>
+
+<table class="data-table">
+  <thead><tr><th>Employee</th><th>Skill</th><th>Gap</th><th>Recommended Resource</th><th>Reason</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for r in recs %}
+    <tr>
+      <td>{{ r.employee.full_name }}</td>
+      <td>{{ r.skill.name }}</td>
+      <td><span class="gap-badge">{{ r.gap }}</span></td>
+      <td>{{ r.resource.title }}</td>
+      <td class="reason">{{ r.reason }}</td>
+      <td><span class="status-pill status-{{ r.status|lower }}">{{ r.status }}</span></td>
+      <td>
+        {% if r.status != 'Completed' %}
+        <form method="POST" action="{{ url_for('recommendation.complete', rec_id=r.id) }}">
+          <button class="btn small" type="submit">Mark Done</button>
+        </form>
+        {% else %}✓{% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7" class="muted">No recommendations yet. Run the engine (managers) or complete assessments first.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% if current_user.role in ('admin','manager') %}
+<div style="margin-top:24px">
+  <a class="btn" href="{{ url_for('recommendation.list_resources') }}">Manage Learning Resources</a>
+  <a class="btn" href="{{ url_for('competency.gap_report') }}">View Gap Report</a>
+</div>
+{% endif %}
+{% endblock %}

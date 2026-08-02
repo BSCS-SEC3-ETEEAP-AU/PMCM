@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>User Accounts (RBAC)</h2>
+<table class="data-table">
+  <thead><tr><th>Username</th><th>Full Name</th><th>Position</th><th>Role</th><th>Work Mode</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for u in users %}
+    <tr>
+      <td>{{ u.username }}</td><td>{{ u.full_name }}</td><td>{{ u.position }}</td>
+      <td><span class="role-badge role-{{ u.role }}">{{ u.role.title() }}</span></td>
+      <td>{{ u.work_mode }}</td>
+      <td>{% if u.is_active %}Active{% else %}Disabled{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="muted">New accounts are seeded via <code>seed.py</code>. Employee accounts link to a competency profile.</p>
+{% endblock %}
