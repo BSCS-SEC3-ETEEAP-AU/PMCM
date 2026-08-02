@@ -11,14 +11,14 @@ This is the implemented web platform described in **Chapters 1–3** of the thes
 | Layer | Technology |
 |---|---|
 | Backend | **Python 3.10+ / Flask** |
-| Database | **PostgreSQL** (hosted on **Supabase Cloud** in production) |
+| Database | **PostgreSQL** (hosted on **Neon** in production) |
 | Frontend | **HTML5, CSS3, JavaScript** (responsive) |
 | Auth | Flask-Login + Role-Based Access Control (RBAC) |
 | Methodology | Agile Scrum (4 sprints, one per module) |
 
 > **Note on running locally:** This build runs against a local PostgreSQL instance so it is
-> demonstrable immediately. To deploy on Supabase, set `DATABASE_URL` in `.env` to your
-> Supabase PostgreSQL connection string — no code changes required (see below).
+> demonstrable immediately. To deploy on Neon, set `DATABASE_URL` in `.env` to your
+> Neon PostgreSQL connection string — no code changes required (see below).
 
 ---
 
@@ -67,13 +67,13 @@ python3.11 run.py
 
 ---
 
-## Switching to Supabase Cloud (thesis deployment)
-1. In Supabase: create a project; the PostgreSQL database is provisioned automatically.
+## Switching to Neon Cloud (thesis deployment)
+1. In Neon: create a project; the PostgreSQL database is provisioned automatically.
 2. Copy `.env.example` → `.env` and set:
    ```
-   DATABASE_URL=postgresql+psycopg2://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
+   DATABASE_URL=postgresql+psycopg2://postgres:[PASSWORD]@db.[PROJECT-REF].Neon.co:5432/postgres
    ```
-3. Run `python3.11 seed.py` once to create tables and load data (or use Supabase SQL editor
+3. Run `python3.11 seed.py` once to create tables and load data (or use Neon SQL editor
    with the schema in `app/models.py`).
 4. No application code changes are needed — SQLAlchemy abstracts the database.
 
@@ -95,12 +95,12 @@ characteristics (thesis Chapter 3, Table 4 rating scale).
 **Characteristic → sample items**
 - **Functional Suitability** — The system performs project management, competency tracking, and recommendation as intended.
 - **Performance Efficiency** — Pages load promptly; recommendation processing is fast.
-- **Compatibility** — Works across browsers; Supabase/PostgreSQL compatible.
+- **Compatibility** — Works across browsers; Neon/PostgreSQL compatible.
 - **Usability** — Interface is clear and easy to navigate for hybrid teams.
 - **Reliability** — The system operates without failure during normal use.
 - **Security** — RBAC ensures users access only their authorized functions/data.
 - **Maintainability** — Modular code (per-sprint blueprints) is easy to modify.
-- **Portability** — Easily deployed to local PostgreSQL or Supabase Cloud.
+- **Portability** — Easily deployed to local PostgreSQL or Neon Cloud.
 
 *(Full questionnaire in thesis Appendix H; this instrument maps the live system to the
 evaluation criteria.)*
