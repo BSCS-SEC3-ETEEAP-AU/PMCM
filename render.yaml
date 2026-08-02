@@ -3,7 +3,7 @@ services:
     name: pmcm-thesis
     runtime: python
     plan: free
-    region: ap-southeast-1
+    region: singapore
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn run:app
     envVars:
