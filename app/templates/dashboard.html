@@ -1,41 +1,213 @@
 {% extends "base.html" %}
+{% block title %}Dashboard · SPM&amp;ECD{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}Overview of projects, tasks and team competencies{% endblock %}
+
 {% block content %}
-<h2>Dashboard</h2>
-<div class="kpi-grid">
-  <div class="kpi"><div class="kpi-num">{{ active_projects }}</div><div class="kpi-label">Active Projects</div></div>
-  <div class="kpi"><div class="kpi-num">{{ total_employees }}</div><div class="kpi-label">Employees</div></div>
-  <div class="kpi"><div class="kpi-num">{{ open_tasks }}</div><div class="kpi-label">Open Tasks</div></div>
-  <div class="kpi"><div class="kpi-num">{{ pending_recs }}</div><div class="kpi-label">Pending Recs</div></div>
-  <div class="kpi"><div class="kpi-num">{{ coverage }}%</div><div class="kpi-label">Competency Coverage</div></div>
+<div class="kpi-row">
+  <div class="kpi-card kpi-green">
+    <div class="kpi-top">
+      <span class="kpi-ico">📋</span>
+    </div>
+    <div class="kpi-body">
+      <div class="kpi-label">Active Projects</div>
+      <div class="kpi-num">{{ kpi_active_projects }}</div>
+    </div>
+    <a class="kpi-link" href="{{ url_for('projects.list_projects') }}">View all projects →</a>
+  </div>
+
+  <div class="kpi-card kpi-blue">
+    <div class="kpi-top">
+      <span class="kpi-ico">🗓</span>
+    </div>
+    <div class="kpi-body">
+      <div class="kpi-label">On-going Tasks</div>
+      <div class="kpi-num">{{ kpi_open_tasks }}</div>
+    </div>
+    <a class="kpi-link" href="{{ url_for('projects.list_projects') }}">View all tasks →</a>
+  </div>
+
+  <div class="kpi-card kpi-amber">
+    <div class="kpi-top">
+      <span class="kpi-ico">👥</span>
+    </div>
+    <div class="kpi-body">
+      <div class="kpi-label">Team Members</div>
+      <div class="kpi-num">{{ kpi_team_members }}</div>
+    </div>
+    <a class="kpi-link" href="{{ url_for('competency.list_employees') }}">View all members →</a>
+  </div>
+
+  <div class="kpi-card kpi-violet">
+    <div class="kpi-top">
+      <span class="kpi-ico">✦</span>
+    </div>
+    <div class="kpi-body">
+      <div class="kpi-label">Competency Gaps</div>
+      <div class="kpi-num">{{ kpi_gap_count }}</div>
+    </div>
+    <a class="kpi-link" href="{{ url_for('competency.gap_report') }}">View details →</a>
+  </div>
 </div>
 
-<div class="dash-grid">
-  <div class="card">
-    <h3>Task Status Distribution</h3>
-    <canvas id="taskChart" width="320" height="220"></canvas>
-  </div>
-  <div class="card">
-    <h3>Competency Coverage by Team</h3>
-    <table class="data-table">
-      <thead><tr><th>Team</th><th>Employees</th><th>Coverage</th></tr></thead>
-      <tbody>
-      {% for t in team_coverage %}
-        <tr><td>{{ t.team }}</td><td>{{ t.employees }}</td>
-            <td>
-              <div class="bar"><span style="width:{{ t.coverage }}%"></span></div>
-              {{ t.coverage }}%
-            </td></tr>
+<div class="dashboard-grid-top">
+  <section class="dash-card progress-card">
+    <div class="card-head">
+      <div>
+        <h3>Project Progress Overview</h3>
+        <p>Overall progress of active projects</p>
+      </div>
+    </div>
+
+    <div class="progress-layout">
+      <div class="donut-panel">
+        <canvas id="progressDonut" width="180" height="180"></canvas>
+      </div>
+
+      <ul class="chart-legend">
+        <li>
+          <span class="legend-dot green"></span>
+          <span class="legend-label">Completed</span>
+          <strong>{{ progress_overview.completed }}%</strong>
+        </li>
+        <li>
+          <span class="legend-dot blue"></span>
+          <span class="legend-label">In Progress</span>
+          <strong>{{ progress_overview.in_progress }}%</strong>
+        </li>
+        <li>
+          <span class="legend-dot gray"></span>
+          <span class="legend-label">Not Started</span>
+          <strong>{{ progress_overview.not_started }}%</strong>
+        </li>
+      </ul>
+    </div>
+
+    <a class="card-link" href="{{ url_for('projects.list_projects') }}">View all projects →</a>
+  </section>
+
+  <section class="dash-card status-card">
+    <div class="card-head">
+      <div>
+        <h3>Tasks by Status</h3>
+        <p>Distribution of tasks</p>
+      </div>
+    </div>
+
+    <canvas id="taskBars" width="420" height="220"></canvas>
+
+    <a class="card-link" href="{{ url_for('projects.list_projects') }}">View all tasks →</a>
+  </section>
+
+  <section class="dash-card deadline-card">
+    <div class="card-head">
+      <div>
+        <h3>Upcoming Deadlines</h3>
+      </div>
+    </div>
+
+    <div class="deadline-list">
+      {% for deadline in upcoming_deadlines %}
+      <div class="deadline-item">
+        <span
+          class="deadline-dot {% if loop.index == 1 %}amber{% elif loop.index == 2 %}blue{% else %}violet{% endif %}"></span>
+        <div class="deadline-body">
+          <span class="deadline-title">{{ deadline.title }}</span>
+          <span class="deadline-date">
+            {% if deadline.date %}{{ deadline.date.strftime('%b %d, %Y') }}{% endif %}
+            {% if deadline.project %} · {{ deadline.project }}{% endif %}
+          </span>
+        </div>
+      </div>
+      {% else %}
+      <div class="empty-state">No upcoming deadlines found.</div>
       {% endfor %}
-      </tbody>
-    </table>
-  </div>
+    </div>
+
+    <a class="card-link" href="{{ url_for('projects.list_projects') }}">View all deadlines →</a>
+  </section>
+</div>
+
+<div class="dashboard-grid-bottom">
+  <section class="dash-card projects-table-card">
+    <div class="card-head">
+      <div>
+        <h3>Active Projects</h3>
+      </div>
+      {% if current_user.role in ('admin', 'manager') %}
+      <a class="btn small" href="{{ url_for('projects.create_project') }}">+ New Project</a>
+      {% endif %}
+    </div>
+
+    <div class="table-wrap">
+      <table class="proj-table">
+        <thead>
+          <tr>
+            <th>Project Name</th>
+            <th>Manager</th>
+            <th>Status</th>
+            <th>Progress</th>
+            <th>Deadline</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for project in active_project_rows %}
+          <tr>
+            <td>
+              <a class="proj-name" href="{{ url_for('projects.detail', project_id=project.id) }}">
+                {{ project.name }}
+              </a>
+            </td>
+            <td>{{ project.manager }}</td>
+            <td>
+              <span class="status-pill status-{{ project.status|lower|replace(' ', '-') }}">{{ project.status }}</span>
+            </td>
+            <td>
+              <div class="progress-cell">
+                <span class="mini-bar"><span style="width: {{ project.progress }}%"></span></span>
+                <span class="proj-pct">{{ project.progress }}%</span>
+              </div>
+            </td>
+            <td>
+              {% if project.target_date %}
+              {{ project.target_date.strftime('%b %d, %Y') }}
+              {% else %}
+              —
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5">
+              <div class="empty-state">No projects available.</div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <a class="card-link" href="{{ url_for('projects.list_projects') }}">View all projects →</a>
+  </section>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
 <script>
-  const taskDist = {{ task_dist | tojson }};
-  drawTaskChart('taskChart', taskDist);
+  const progressOverview = {{ progress_overview | tojson }};
+  const taskBars = {{ task_bars | tojson }};
+  const taskBarMax = {{ task_bar_max }};
+
+  if (typeof drawDonut === 'function') {
+    drawDonut('progressDonut', progressOverview, {
+      centerText: '{{ overall_pct }}%',
+      centerSub: 'Overall Progress'
+    });
+  }
+
+  if (typeof drawHBar === 'function') {
+    drawHBar('taskBars', taskBars, taskBarMax);
+  }
 </script>
 {% endblock %}

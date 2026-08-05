@@ -8,47 +8,124 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 
-<body>
-  {% if current_user.is_authenticated %}
-  <header class="topbar">
-    <div class="brand">
-      <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="" class="brand-logo-sm">
-      <span>SPM&amp;ECD<span class="sub">· TMC Hybrid Teams</span></span>
-    </div>
-    <nav>
-      <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
-      <a href="{{ url_for('projects.list_projects') }}">Projects</a>
-      <a href="{{ url_for('competency.list_employees') }}">Competency</a>
-      <a href="{{ url_for('recommendation.my_recommendations') }}">Learning</a>
-      {% if current_user.role in ('admin','manager') %}
-      <a href="{{ url_for('reports.index') }}">Reports</a>
-      {% endif %}
-      {% if current_user.role == 'admin' %}
-      <a href="{{ url_for('auth.accounts') }}">Accounts</a>
-      {% endif %}
-    </nav>
-    <div class="userbox">
-      <span class="role-badge role-{{ current_user.role }}">{{ current_user.role.title() }}</span>
-      <span class="uname">{{ current_user.full_name }}</span>
-      <a href="{{ url_for('auth.logout') }}" class="logout">Logout</a>
-    </div>
-  </header>
-  {% endif %}
+{% set show_shell = current_user.is_authenticated and not (hide_chrome|default(false)) %}
 
-  <main class="container">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-    {% for cat, msg in messages %}
-    <div class="flash flash-{{ cat }}">{{ msg }}</div>
-    {% endfor %}
-    {% endif %}
-    {% endwith %}
-    {% block content %}{% endblock %}
-  </main>
+<body class="{% if show_shell %}with-shell{% else %}without-shell{% endif %}">
+  {% if show_shell %}
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="side-brand">
+        <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="SPM&ECD" class="brand-logo-sm">
+        <span>SPM&amp;ECD</span>
+      </div>
 
+      <nav class="side-nav" aria-label="Primary navigation">
+        <a class="{% if request.endpoint == 'main.dashboard' %}active{% endif %}"
+          href="{{ url_for('main.dashboard') }}">
+          <span class="nav-ico">⌂</span>
+          <span>Dashboard</span>
+        </a>
+        <a class="{% if request.endpoint and request.endpoint.startswith('projects.') %}active{% endif %}"
+          href="{{ url_for('projects.list_projects') }}">
+          <span class="nav-ico">□</span>
+          <span>Projects</span>
+        </a>
+        <a href="{{ url_for('projects.list_projects') }}">
+          <span class="nav-ico">✓</span>
+          <span>Tasks</span>
+        </a>
+        <a class="{% if request.endpoint and request.endpoint.startswith('competency.') and 'skills' not in request.endpoint and 'gap' not in request.endpoint %}active{% endif %}"
+          href="{{ url_for('competency.list_employees') }}">
+          <span class="nav-ico">◌</span>
+          <span>Team</span>
+        </a>
+        <a class="{% if request.endpoint and request.endpoint.startswith('competency.') and ('skills' in request.endpoint or 'gap' in request.endpoint) %}active{% endif %}"
+          href="{{ url_for('competency.list_skills') }}">
+          <span class="nav-ico">◎</span>
+          <span>Competencies</span>
+        </a>
+        <a class="{% if request.endpoint and request.endpoint.startswith('recommendation.') %}active{% endif %}"
+          href="{{ url_for('recommendation.my_recommendations') }}">
+          <span class="nav-ico">▤</span>
+          <span>Learning</span>
+        </a>
+        {% if current_user.role in ('admin', 'manager') %}
+        <a class="{% if request.endpoint and request.endpoint.startswith('reports.') %}active{% endif %}"
+          href="{{ url_for('reports.index') }}">
+          <span class="nav-ico">◫</span>
+          <span>Reports</span>
+        </a>
+        {% endif %}
+        {% if current_user.role == 'admin' %}
+        <a class="{% if request.endpoint == 'auth.accounts' %}active{% endif %}" href="{{ url_for('auth.accounts') }}">
+          <span class="nav-ico">⚙</span>
+          <span>Settings</span>
+        </a>
+        {% endif %}
+      </nav>
+
+      <div class="side-foot">
+        <div class="side-user-badge">{{ current_user.full_name[:1] }}</div>
+        <div class="side-user-meta">
+          <span class="side-user-role">{{ current_user.position or current_user.role.title() }}</span>
+          <span class="side-user-access">Full Access</span>
+        </div>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="appbar">
+        <button class="menu-toggle" type="button" aria-label="Open navigation">☰</button>
+
+        <div class="appbar-right">
+          <button class="icon-btn notif-btn" type="button" aria-label="Notifications">
+            <span class="notif-ico">🔔</span>
+            <span class="notif-badge">3</span>
+          </button>
+
+          <details class="user-menu">
+            <summary>
+              <span class="user-avatar">{{ current_user.full_name[:1] }}</span>
+              <span class="user-text">
+                <strong>{{ current_user.full_name }}</strong>
+                <small>{{ current_user.position or current_user.role.title() }}</small>
+              </span>
+              <span class="user-caret">⌄</span>
+            </summary>
+            <div class="user-dropdown">
+              <a href="{{ url_for('auth.logout') }}">Logout</a>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      <div class="page-wrap">
+        <div class="page-header">
+          <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+          <p>{% block page_subtitle %}Overview of projects, tasks and team competencies{% endblock %}</p>
+        </div>
+        {% endif %}
+
+        <main class="{% if show_shell %}page-content{% else %}container{% endif %}">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+          {% for cat, msg in messages %}
+          <div class="flash flash-{{ cat }}">{{ msg }}</div>
+          {% endfor %}
+          {% endif %}
+          {% endwith %}
+          {% block content %}{% endblock %}
+        </main>
+
+        {% if show_shell %}
+      </div>
+    </div>
+  </div>
+  {% elif not (hide_chrome|default(false)) %}
   <footer class="footer">
     BS CS Thesis · Arellano University (ETEEAP) · IT Architecture & Data Engineering Dept., The Medical City
   </footer>
+  {% endif %}
 
   {% block scripts %}{% endblock %}
 </body>
