@@ -50,30 +50,34 @@ def dashboard():
     assessments = CompetencyAssessment.query.all()
     kpi_gap_count = sum(1 for assessment in assessments if assessment.gap > 0)
 
-    # ----- Project Progress Overview (project-based, active projects only) -----
-    project_progress_values = []
-    completed_projects = 0
-    in_progress_projects = 0
-    not_started_projects = 0
+        # ----- Task Per Project Progress (task-based, active projects only) -----
+    if active_project_ids:
+        total_active_tasks = Task.query.filter(Task.project_id.in_(active_project_ids)).count()
+        completed_tasks = Task.query.filter(
+            Task.project_id.in_(active_project_ids),
+            Task.status == "Done"
+        ).count()
+        in_progress_tasks = Task.query.filter(
+            Task.project_id.in_(active_project_ids),
+            Task.status.in_(["In Progress", "In Review"])
+        ).count()
+        not_started_tasks = Task.query.filter(
+            Task.project_id.in_(active_project_ids),
+            Task.status.in_(["Backlog", "To Do"])
+        ).count()
+    else:
+        total_active_tasks = 0
+        completed_tasks = 0
+        in_progress_tasks = 0
+        not_started_tasks = 0
 
-    for project in active_projects:
-        progress = project_progress_pct(project.id)
-        project_progress_values.append(progress)
-
-        if progress >= 100:
-            completed_projects += 1
-        elif progress > 0:
-            in_progress_projects += 1
-        else:
-            not_started_projects += 1
-
-    if kpi_active_projects > 0:
+    if total_active_tasks > 0:
         progress_overview = {
-            "completed": pct(completed_projects, kpi_active_projects),
-            "in_progress": pct(in_progress_projects, kpi_active_projects),
-            "not_started": pct(not_started_projects, kpi_active_projects),
+            "completed": pct(completed_tasks, total_active_tasks),
+            "in_progress": pct(in_progress_tasks, total_active_tasks),
+            "not_started": pct(not_started_tasks, total_active_tasks),
         }
-        overall_pct = int((sum(project_progress_values) / kpi_active_projects) + 0.5)
+        overall_pct = pct(completed_tasks, total_active_tasks)
     else:
         progress_overview = {
             "completed": 0,
