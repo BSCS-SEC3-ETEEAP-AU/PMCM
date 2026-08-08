@@ -32,10 +32,14 @@
       <span class="kpi-ico">👥</span>
     </div>
     <div class="kpi-body">
-      <div class="kpi-label">Team Members</div>
+      <div class="kpi-label">{% if employee_view %}Project Teammates{% else %}Team Members{% endif %}</div>
       <div class="kpi-num">{{ kpi_team_members }}</div>
     </div>
+    {% if employee_view %}
+    <a class="kpi-link" href="{{ url_for('projects.list_projects') }}">View project teams →</a>
+    {% else %}
     <a class="kpi-link" href="{{ url_for('competency.list_employees') }}">View all members →</a>
+    {% endif %}
   </div>
 
   <div class="kpi-card kpi-violet">
@@ -46,7 +50,11 @@
       <div class="kpi-label">Competency Gaps</div>
       <div class="kpi-num">{{ kpi_gap_count }}</div>
     </div>
+    {% if employee_view %}
+    <a class="kpi-link" href="{{ url_for('competency.my_profile') }}">View my competencies →</a>
+    {% else %}
     <a class="kpi-link" href="{{ url_for('competency.gap_report') }}">View details →</a>
+    {% endif %}
   </div>
 </div>
 

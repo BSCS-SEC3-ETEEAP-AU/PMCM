@@ -4,7 +4,7 @@ Manages competency profiles, skills, certifications, competency assessments,
 and gap analysis (thesis Fig. 6). Employees complete assessments; the system
 computes current vs required gaps that feed the recommendation engine.
 """
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
 from ..models import (
     db, Employee, Skill, Certification, CompetencyAssessment, User,
@@ -14,9 +14,42 @@ from ..decorators import manager_required
 competency_bp = Blueprint("competency", __name__, url_prefix="/competency")
 
 
+def _current_employee():
+    """Return the Employee profile linked to the signed-in user, if any."""
+    return Employee.query.filter_by(user_id=current_user.id).first()
+
+
+def _enforce_employee_scope(employee_id):
+    """Allow Admin/Manager to access any profile; Employee only their own."""
+    if current_user.role in ("admin", "manager"):
+        return
+    if current_user.role == "employee":
+        emp = _current_employee()
+        if emp and emp.id == employee_id:
+            return
+    abort(403)
+
+
+@competency_bp.route("/me")
+@login_required
+def my_profile():
+    """Safe shortcut for employees to open their own competency profile."""
+    emp = _current_employee()
+    if not emp:
+        flash("No competency profile is linked to your account.", "warning")
+        return redirect(url_for("main.dashboard"))
+    return redirect(url_for("competency.employee_profile", employee_id=emp.id))
+
+
 @competency_bp.route("/employees")
 @login_required
 def list_employees():
+    # Employees should not receive an organization-wide employee directory here.
+    if current_user.role == "employee":
+        return redirect(url_for("competency.my_profile"))
+    if current_user.role not in ("admin", "manager"):
+        abort(403)
+
     employees = Employee.query.order_by(Employee.full_name).all()
     return render_template("competency/employees.html", employees=employees)
 
@@ -24,6 +57,7 @@ def list_employees():
 @competency_bp.route("/employees/<int:employee_id>")
 @login_required
 def employee_profile(employee_id):
+    _enforce_employee_scope(employee_id)
     emp = Employee.query.get_or_404(employee_id)
     certs = Certification.query.filter_by(employee_id=employee_id).order_by(Certification.issued_date.desc()).all()
     assessments = CompetencyAssessment.query.filter_by(employee_id=employee_id).all()
@@ -37,16 +71,10 @@ def employee_profile(employee_id):
 @competency_bp.route("/employees/<int:employee_id>/assess", methods=["GET", "POST"])
 @login_required
 def assess(employee_id):
-    """Employees complete (or managers record) a competency assessment."""
+    """Employees complete their own assessment; Manager/Admin may record any."""
+    _enforce_employee_scope(employee_id)
     emp = Employee.query.get_or_404(employee_id)
     skills = Skill.query.order_by(Skill.name).all()
-
-    # Restrict: employees can only assess themselves
-    if current_user.role == "employee":
-        my_emp = Employee.query.filter_by(user_id=current_user.id).first()
-        if not my_emp or my_emp.id != employee_id:
-            flash("You can only assess your own competency profile.", "warning")
-            return redirect(url_for("competency.employee_profile", employee_id=employee_id))
 
     if request.method == "POST":
         for skill in skills:
@@ -75,10 +103,10 @@ def assess(employee_id):
 @competency_bp.route("/employees/<int:employee_id>/cert/add", methods=["POST"])
 @login_required
 def add_cert(employee_id):
+    _enforce_employee_scope(employee_id)
     emp = Employee.query.get_or_404(employee_id)
     name = request.form.get("name", "").strip()
     if name:
-        from datetime import datetime
         db.session.add(Certification(
             employee_id=employee_id,
             name=name,
@@ -114,9 +142,9 @@ def add_skill():
 
 
 @competency_bp.route("/gap-report")
-@login_required
+@manager_required
 def gap_report():
-    """Org-wide competency gap analysis (manager/admin focus)."""
+    """Organization-wide competency gap analysis for Manager/Admin."""
     assessments = CompetencyAssessment.query.all()
     rows = []
     for a in assessments:

@@ -21,10 +21,7 @@
             <span class="prio prio-{{ t.priority|lower }}">{{ t.priority }}</span>
             {% if t.assignee %}<span>{{ t.assignee.full_name }}</span>{% endif %}
           </div>
-          {% if current_user.role == 'employee' %}
-            {% set my_emp = none %}
-          {% endif %}
-          {% if current_user.role in ('admin','manager') or (current_user.role=='employee') %}
+          {% if current_user.role in ('admin','manager') or (current_user.role == 'employee' and t.assignee and t.assignee.user_id == current_user.id) %}
           <form method="POST" action="{{ url_for('projects.update_task', task_id=t.id) }}">
             <select name="status" onchange="this.form.submit()">
               {% for s in statuses %}<option {% if s==t.status %}selected{% endif %}>{{ s }}</option>{% endfor %}

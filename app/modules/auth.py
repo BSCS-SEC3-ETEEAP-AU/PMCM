@@ -2,6 +2,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from ..models import db, User
+from ..decorators import admin_required
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -31,10 +32,7 @@ def logout():
 
 
 @auth_bp.route("/accounts")
-@login_required
+@admin_required
 def accounts():
-    if current_user.role != "admin":
-        flash("Only administrators can manage accounts.", "warning")
-        return redirect(url_for("main.dashboard"))
     users = User.query.order_by(User.role, User.full_name).all()
     return render_template("auth/accounts.html", users=users)

@@ -2,9 +2,9 @@
 from datetime import date
 
 from flask import Blueprint, render_template
-from flask_login import login_required
+from flask_login import login_required, current_user
 
-from ..models import Project, Task, Employee, CompetencyAssessment, Milestone
+from ..models import Project, Task, Employee, CompetencyAssessment, Milestone, ProjectMember
 
 main_bp = Blueprint("main", __name__)
 
@@ -34,9 +34,28 @@ def project_progress_pct(project_id):
 @main_bp.route("/dashboard")
 @login_required
 def dashboard():
-    # ----- Shared datasets -----
+    employee_view = current_user.role == "employee"
+    employee = None
+    member_project_ids = []
+
+    if employee_view:
+        employee = Employee.query.filter_by(user_id=current_user.id).first()
+        if employee:
+            member_project_ids = [
+                pm.project_id
+                for pm in ProjectMember.query.filter_by(employee_id=employee.id).all()
+            ]
+
+    # ----- Shared datasets, scoped by role -----
+    active_projects_query = Project.query.filter_by(status="Active")
+    if employee_view:
+        if member_project_ids:
+            active_projects_query = active_projects_query.filter(Project.id.in_(member_project_ids))
+        else:
+            active_projects_query = active_projects_query.filter(Project.id == -1)
+
     active_projects = (
-        Project.query.filter_by(status="Active")
+        active_projects_query
         .order_by(Project.target_date.asc(), Project.id.desc())
         .all()
     )
@@ -44,13 +63,31 @@ def dashboard():
 
     # ----- Top cards -----
     kpi_active_projects = len(active_projects)
-    kpi_open_tasks = Task.query.filter(Task.status != "Done").count()
-    kpi_team_members = Employee.query.count()
 
-    assessments = CompetencyAssessment.query.all()
+    if employee_view:
+        kpi_open_tasks = (
+            Task.query.filter(Task.assignee_id == employee.id, Task.status != "Done").count()
+            if employee else 0
+        )
+        kpi_team_members = (
+            ProjectMember.query.with_entities(ProjectMember.employee_id)
+            .filter(ProjectMember.project_id.in_(active_project_ids))
+            .distinct()
+            .count()
+            if active_project_ids else 0
+        )
+        assessments = (
+            CompetencyAssessment.query.filter_by(employee_id=employee.id).all()
+            if employee else []
+        )
+    else:
+        kpi_open_tasks = Task.query.filter(Task.status != "Done").count()
+        kpi_team_members = Employee.query.count()
+        assessments = CompetencyAssessment.query.all()
+
     kpi_gap_count = sum(1 for assessment in assessments if assessment.gap > 0)
 
-        # ----- Task Per Project Progress (task-based, active projects only) -----
+    # ----- Task Per Project Progress (accessible active projects only) -----
     if active_project_ids:
         total_active_tasks = Task.query.filter(Task.project_id.in_(active_project_ids)).count()
         completed_tasks = Task.query.filter(
@@ -86,11 +123,18 @@ def dashboard():
         }
         overall_pct = 0
 
-    # ----- Tasks by Status (task-based) -----
-    todo_count = Task.query.filter(Task.status.in_(["Backlog", "To Do"])).count()
-    in_progress_count = Task.query.filter_by(status="In Progress").count()
-    in_review_count = Task.query.filter_by(status="In Review").count()
-    completed_count = Task.query.filter_by(status="Done").count()
+    # ----- Tasks by Status -----
+    task_query = Task.query
+    if employee_view:
+        if employee:
+            task_query = task_query.filter(Task.assignee_id == employee.id)
+        else:
+            task_query = task_query.filter(Task.id == -1)
+
+    todo_count = task_query.filter(Task.status.in_(["Backlog", "To Do"])).count()
+    in_progress_count = task_query.filter(Task.status == "In Progress").count()
+    in_review_count = task_query.filter(Task.status == "In Review").count()
+    completed_count = task_query.filter(Task.status == "Done").count()
 
     task_bars = [
         {"label": "To Do", "count": todo_count},
@@ -102,7 +146,7 @@ def dashboard():
     max_bar_value = max((item["count"] for item in task_bars), default=0)
     task_bar_max = max(10, ((max_bar_value + 9) // 10) * 10) if max_bar_value else 10
 
-    # ----- Active Projects table (active projects only) -----
+    # ----- Active Projects table -----
     active_project_rows = []
     for project in active_projects[:5]:
         active_project_rows.append(
@@ -116,7 +160,7 @@ def dashboard():
             }
         )
 
-    # ----- Upcoming Deadlines (active-project milestones only) -----
+    # ----- Upcoming Deadlines (accessible active-project milestones only) -----
     upcoming_deadlines = []
     if active_project_ids:
         deadline_rows = (
@@ -141,6 +185,7 @@ def dashboard():
 
     return render_template(
         "dashboard.html",
+        employee_view=employee_view,
         kpi_active_projects=kpi_active_projects,
         kpi_open_tasks=kpi_open_tasks,
         kpi_team_members=kpi_team_members,

@@ -13,6 +13,8 @@ from ..decorators import manager_required
 
 projects_bp = Blueprint("projects", __name__, url_prefix="/projects")
 
+TASK_STATUSES = ["Backlog", "To Do", "In Progress", "In Review", "Done"]
+
 
 @projects_bp.route("/")
 @login_required
@@ -59,6 +61,21 @@ def create_project():
 @login_required
 def detail(project_id):
     project = Project.query.get_or_404(project_id)
+
+    # Employees may only open projects where they are an assigned member.
+    if current_user.role == "employee":
+        emp = Employee.query.filter_by(user_id=current_user.id).first()
+        is_member = (
+            emp is not None
+            and ProjectMember.query.filter_by(
+                project_id=project_id, employee_id=emp.id
+            ).first() is not None
+        )
+        if not is_member:
+            abort(403)
+    elif current_user.role not in ("admin", "manager"):
+        abort(403)
+
     tasks = Task.query.filter_by(project_id=project_id).all()
     members = (
         db.session.query(Employee)
@@ -78,7 +95,7 @@ def detail(project_id):
         "projects/detail.html",
         project=project, tasks=tasks, members=members,
         milestones=milestones, skills=skills, employees=employees,
-        progress=progress, statuses=["Backlog", "To Do", "In Progress", "In Review", "Done"],
+        progress=progress, statuses=TASK_STATUSES,
     )
 
 
@@ -111,12 +128,24 @@ def create_task(project_id):
 @login_required
 def update_task(task_id):
     task = Task.query.get_or_404(task_id)
+
+    # Employees may update only tasks assigned to their own employee profile.
+    if current_user.role == "employee":
+        emp = Employee.query.filter_by(user_id=current_user.id).first()
+        if not emp or task.assignee_id != emp.id:
+            abort(403)
+    elif current_user.role not in ("admin", "manager"):
+        abort(403)
+
     new_status = request.form.get("status")
-    if new_status:
-        task.status = new_status
-        task.updated_at = db.func.now()
-        db.session.commit()
-        flash(f"Task '{task.title}' → {new_status}.", "success")
+    if new_status not in TASK_STATUSES:
+        flash("Invalid task status.", "danger")
+        return redirect(url_for("projects.detail", project_id=task.project_id))
+
+    task.status = new_status
+    task.updated_at = db.func.now()
+    db.session.commit()
+    flash(f"Task '{task.title}' → {new_status}.", "success")
     return redirect(url_for("projects.detail", project_id=task.project_id))
 
 
