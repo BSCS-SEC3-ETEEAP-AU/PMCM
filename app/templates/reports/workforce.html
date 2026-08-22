@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block page_title %}Workforce Summary{% endblock %}
+{% block page_subtitle %}Team readiness, development needs and learning progress in one management view{% endblock %}
+{% block content %}
+<div class="report-page-toolbar"><a class="btn secondary" href="{{ url_for('reports.index') }}">← Reports Overview</a></div>
+
+<form class="module-panel report-filter-panel" method="GET" action="{{ url_for('reports.workforce_summary') }}">
+  <div class="report-filter-head"><div><h2>Report Filters</h2><p>Coverage compares current employee proficiency with active project requirements.</p></div></div>
+  <div class="report-filter-grid report-filter-grid-compact">
+    <label><span>Search</span><input type="search" name="q" value="{{ search }}" placeholder="Search team..."></label>
+    <label><span>Team</span><select name="team"><option value="">All Teams</option>{% for t in teams %}<option value="{{ t }}" {% if selected_team==t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+  </div>
+  <div class="report-filter-actions"><a class="btn secondary" href="{{ url_for('reports.workforce_summary') }}">Clear</a><button class="btn secondary" type="submit" name="export" value="csv">Export CSV</button><button class="btn primary" type="submit">Apply Filters</button></div>
+</form>
+
+<section class="module-kpi-row report-detail-kpis">
+  <div class="module-kpi-card mk-blue"><span class="module-kpi-icon">▥</span><div><span class="module-kpi-label">Teams</span><strong>{{ summary.teams }}</strong><small>Included teams</small></div></div>
+  <div class="module-kpi-card mk-green"><span class="module-kpi-icon">○</span><div><span class="module-kpi-label">Members</span><strong>{{ summary.members }}</strong><small>Employees represented</small></div></div>
+  <div class="module-kpi-card mk-violet"><span class="module-kpi-icon">◎</span><div><span class="module-kpi-label">Requirements</span><strong>{{ summary.requirements }}</strong><small>Active project targets</small></div></div>
+  <div class="module-kpi-card mk-amber"><span class="module-kpi-icon">!</span><div><span class="module-kpi-label">Open Gaps</span><strong>{{ summary.gaps }}</strong><small>Development needs</small></div></div>
+</section>
+
+<section class="module-panel report-table-panel">
+  <div class="module-panel-head"><div><h2>Team Readiness</h2><p>Summarized workforce information for project monitoring and development planning</p></div></div>
+  <div class="table-scroll"><table class="data-table report-data-table workforce-report-table">
+    <thead><tr><th>Team</th><th>Members</th><th>Projects Represented</th><th>Active Skill Requirements</th><th>Coverage</th><th>Open Gaps</th><th>Learning In Progress</th><th>Learning Completed</th></tr></thead>
+    <tbody>{% for r in rows %}<tr>
+      <td><strong>{{ r.team }}</strong></td><td>{{ r.members }}</td><td>{{ r.projects }}</td><td>{{ r.requirements }}</td>
+      <td><div class="report-progress-cell"><div class="coverage-track"><span style="width:{{ r.coverage }}%"></span></div><strong>{{ r.coverage }}%</strong></div></td>
+      <td>{{ r.gaps }}</td><td>{{ r.in_progress }}</td><td>{{ r.completed }}</td>
+    </tr>{% else %}<tr><td colspan="8"><div class="empty-state">No workforce data match the selected filters.</div></td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endblock %}

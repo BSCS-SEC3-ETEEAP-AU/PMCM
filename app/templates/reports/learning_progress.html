@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block page_title %}Learning Progress Report{% endblock %}
+{% block page_subtitle %}Monitor recommended, in-progress and completed learning activities{% endblock %}
+{% block content %}
+<div class="report-page-toolbar"><a class="btn secondary" href="{{ url_for('reports.index') }}">← Reports Overview</a></div>
+
+<form class="module-panel report-filter-panel" method="GET" action="{{ url_for('reports.learning_progress') }}">
+  <div class="report-filter-head"><div><h2>Report Filters</h2><p>Date range filters use the date the learning recommendation was generated.</p></div></div>
+  <div class="report-filter-grid report-filter-grid-seven">
+    <label><span>Search</span><input type="search" name="q" value="{{ search }}" placeholder="Employee or resource..."></label>
+    <label><span>Team</span><select name="team"><option value="">All Teams</option>{% for t in teams %}<option value="{{ t }}" {% if selected_team==t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+    <label><span>Employee</span><select name="employee_id"><option value="">All Employees</option>{% for e in employees %}<option value="{{ e.id }}" {% if selected_employee_id==e.id %}selected{% endif %}>{{ e.full_name }}</option>{% endfor %}</select></label>
+    <label><span>Skill</span><select name="skill_id"><option value="">All Skills</option>{% for s in skills %}<option value="{{ s.id }}" {% if selected_skill_id==s.id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}</select></label>
+    <label><span>Status</span><select name="status"><option value="">All Statuses</option>{% for s in ['Recommended','In Progress','Completed'] %}<option value="{{ s }}" {% if selected_status==s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></label>
+    <label><span>Recommended From</span><input type="date" name="date_from" value="{{ date_from.isoformat() if date_from else '' }}"></label>
+    <label><span>Recommended To</span><input type="date" name="date_to" value="{{ date_to.isoformat() if date_to else '' }}"></label>
+  </div>
+  <div class="report-filter-actions"><a class="btn secondary" href="{{ url_for('reports.learning_progress') }}">Clear</a><button class="btn secondary" type="submit" name="export" value="csv">Export CSV</button><button class="btn primary" type="submit">Apply Filters</button></div>
+</form>
+
+<section class="module-kpi-row report-detail-kpis">
+  <div class="module-kpi-card mk-blue"><span class="module-kpi-icon">◇</span><div><span class="module-kpi-label">Activities</span><strong>{{ summary.total }}</strong><small>Filtered learning records</small></div></div>
+  <div class="module-kpi-card mk-violet"><span class="module-kpi-icon">○</span><div><span class="module-kpi-label">Recommended</span><strong>{{ summary.recommended }}</strong><small>Not started</small></div></div>
+  <div class="module-kpi-card mk-amber"><span class="module-kpi-icon">↗</span><div><span class="module-kpi-label">In Progress</span><strong>{{ summary.in_progress }}</strong><small>Currently learning</small></div></div>
+  <div class="module-kpi-card mk-green"><span class="module-kpi-icon">✓</span><div><span class="module-kpi-label">Completed</span><strong>{{ summary.completed }}</strong><small>{{ summary.completion }}% completion rate</small></div></div>
+</section>
+
+<section class="module-panel report-table-panel">
+  <div class="module-panel-head"><div><h2>Learning Results</h2><p>Completion records remain learning history; competency changes require reassessment</p></div></div>
+  <div class="table-scroll"><table class="data-table report-data-table learning-report-table">
+    <thead><tr><th>Employee</th><th>Team</th><th>Learning Resource</th><th>Skill</th><th>Provider / Access</th><th>Status</th><th>Gap</th><th>Recommended</th><th>Completed</th></tr></thead>
+    <tbody>{% for r in rows %}<tr>
+      <td><strong>{{ r.employee }}</strong></td><td>{{ r.team }}</td><td>{{ r.resource }}</td><td>{{ r.skill }}</td>
+      <td>{{ r.provider }}<small class="report-subtext">{{ r.access }}</small></td><td><span class="report-status report-status-{{ r.status|lower|replace(' ','-') }}">{{ r.status }}</span></td>
+      <td>{{ r.gap }} level{{ '' if r.gap == 1 else 's' }}</td><td>{{ r.created_at.strftime('%b %d, %Y') if r.created_at else '—' }}</td><td>{{ r.completed_at.strftime('%b %d, %Y') if r.completed_at else '—' }}</td>
+    </tr>{% else %}<tr><td colspan="9"><div class="empty-state">No learning records match the selected filters.</div></td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endblock %}

@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 {% block page_title %}Reports{% endblock %}
-{% block page_subtitle %}Project, workforce and competency insights for managerial decision-making{% endblock %}
+{% block page_subtitle %}Project, workforce, competency and learning insights for managerial decision-making{% endblock %}
 {% block content %}
 <section class="module-kpi-row reports-kpi-row" aria-label="Report summary">
   <a class="module-kpi-card mk-green" href="{{ url_for('reports.project_status') }}">
     <span class="module-kpi-icon">↗</span><div><span class="module-kpi-label">Project Status</span><strong>{{ report_summary.total_projects }}</strong><small>Total projects</small></div>
   </a>
-  <a class="module-kpi-card mk-blue" href="{{ url_for('reports.competency_report') }}">
+  <a class="module-kpi-card mk-blue" href="{{ url_for('reports.workforce_summary') }}">
     <span class="module-kpi-icon">▥</span><div><span class="module-kpi-label">Team Coverage</span><strong>{{ report_summary.team_members }}</strong><small>Team members</small></div>
   </a>
-  <a class="module-kpi-card mk-amber" href="{{ url_for('competency.gap_report') }}">
-    <span class="module-kpi-icon">◎</span><div><span class="module-kpi-label">Competency Gaps</span><strong>{{ report_summary.gap_count }}</strong><small>Open gaps</small></div>
+  <a class="module-kpi-card mk-amber" href="{{ url_for('reports.competency_report') }}">
+    <span class="module-kpi-icon">◎</span><div><span class="module-kpi-label">Competency Gaps</span><strong>{{ report_summary.gap_count }}</strong><small>Open project-driven gaps</small></div>
   </a>
-  <a class="module-kpi-card mk-violet" href="{{ url_for('recommendation.my_recommendations') }}">
+  <a class="module-kpi-card mk-violet" href="{{ url_for('reports.learning_progress') }}">
     <span class="module-kpi-icon">◇</span><div><span class="module-kpi-label">Learning Completion</span><strong>{{ report_summary.learning_completion }}%</strong><small>Completion rate</small></div>
   </a>
 </section>
@@ -33,21 +33,43 @@
   </article>
 
   <article class="module-panel report-chart-card">
-    <div class="module-panel-head"><div><h2>Competency Coverage by Team</h2><p>Share of assessed competencies meeting target proficiency</p></div><a href="{{ url_for('reports.competency_report') }}">View report →</a></div>
+    <div class="module-panel-head"><div><h2>Competency Coverage by Team</h2><p>Share of active project competency requirements currently met</p></div><a href="{{ url_for('reports.workforce_summary') }}">View report →</a></div>
     <div class="coverage-bars">
       {% for row in team_coverage %}
       <div class="coverage-row">
         <div class="coverage-label"><span>{{ row.team }}</span><strong>{{ row.coverage }}%</strong></div>
         <div class="coverage-track"><span style="width: {{ row.coverage }}%"></span></div>
-        <small>{{ row.assessed }} assessed · {{ row.gaps }} gap{{ '' if row.gaps == 1 else 's' }}</small>
+        <small>{{ row.assessed }} active requirement{{ '' if row.assessed == 1 else 's' }} · {{ row.gaps }} open gap{{ '' if row.gaps == 1 else 's' }}</small>
       </div>
-      {% else %}<div class="empty-state">No competency assessment data available.</div>{% endfor %}
+      {% else %}<div class="empty-state">No active project competency requirements are available.</div>{% endfor %}
     </div>
   </article>
 </section>
 
+<section class="module-panel available-reports-panel">
+  <div class="module-panel-head"><div><h2>Available Reports</h2><p>Generate filtered management views and export the current results to CSV</p></div></div>
+  <div class="available-report-grid">
+    <a class="available-report-card" href="{{ url_for('reports.project_status') }}">
+      <span class="available-report-icon report-icon-project">↗</span>
+      <div><strong>Project Status Report</strong><p>Project progress, managers, deadlines, task completion and milestones.</p><span>Open report →</span></div>
+    </a>
+    <a class="available-report-card" href="{{ url_for('reports.competency_report') }}">
+      <span class="available-report-icon report-icon-competency">◎</span>
+      <div><strong>Competency Report</strong><p>Current proficiency, project targets, competency gaps and requirement sources.</p><span>Open report →</span></div>
+    </a>
+    <a class="available-report-card" href="{{ url_for('reports.learning_progress') }}">
+      <span class="available-report-icon report-icon-learning">◇</span>
+      <div><strong>Learning Progress Report</strong><p>Recommended, in-progress and completed development activities by employee.</p><span>Open report →</span></div>
+    </a>
+    <a class="available-report-card" href="{{ url_for('reports.workforce_summary') }}">
+      <span class="available-report-icon report-icon-workforce">▥</span>
+      <div><strong>Workforce Summary</strong><p>Team readiness, project requirements, open gaps and learning progress.</p><span>Open report →</span></div>
+    </a>
+  </div>
+</section>
+
 <section class="module-panel recent-report-panel">
-  <div class="module-panel-head"><div><h2>Recent Reports</h2><p>Latest report activity recorded by the system</p></div></div>
+  <div class="module-panel-head"><div><h2>Recent Reports</h2><p>Latest report generation and export activity recorded by the system</p></div></div>
   <div class="recent-report-grid">
     {% for log in recent_reports %}
     <div class="recent-report-item">

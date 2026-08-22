@@ -1,24 +1,41 @@
 {% extends "base.html" %}
+{% block page_title %}Project Status Report{% endblock %}
+{% block page_subtitle %}Monitor project progress, ownership, deadlines, tasks and milestones{% endblock %}
 {% block content %}
-<h2>Project Status Report</h2>
-<form class="inline-form" method="GET" action="{{ url_for('reports.project_status') }}">
-  <select name="project_id">
-    <option value="">— All Projects —</option>
-    {% for p in projects %}<option value="{{ p.id }}" {% if selected and selected.id==p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
-  </select>
-  <button class="btn primary" type="submit">Generate</button>
+<div class="report-page-toolbar">
+  <a class="btn secondary" href="{{ url_for('reports.index') }}">← Reports Overview</a>
+</div>
+
+<form class="module-panel report-filter-panel" method="GET" action="{{ url_for('reports.project_status') }}">
+  <div class="report-filter-head"><div><h2>Report Filters</h2><p>Target date filters apply to the project's target/deadline date.</p></div></div>
+  <div class="report-filter-grid report-filter-grid-six">
+    <label><span>Search</span><input type="search" name="q" value="{{ search }}" placeholder="Project or manager..."></label>
+    <label><span>Project</span><select name="project_id"><option value="">All Projects</option>{% for p in projects %}<option value="{{ p.id }}" {% if selected_project_id==p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></label>
+    <label><span>Status</span><select name="status"><option value="">All Statuses</option>{% for s in ['Active','Completed','On Hold'] %}<option value="{{ s }}" {% if selected_status==s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></label>
+    <label><span>Manager</span><select name="manager_id"><option value="">All Managers</option>{% for m in managers %}<option value="{{ m.id }}" {% if selected_manager_id==m.id %}selected{% endif %}>{{ m.full_name }}</option>{% endfor %}</select></label>
+    <label><span>Target From</span><input type="date" name="date_from" value="{{ date_from.isoformat() if date_from else '' }}"></label>
+    <label><span>Target To</span><input type="date" name="date_to" value="{{ date_to.isoformat() if date_to else '' }}"></label>
+  </div>
+  <div class="report-filter-actions"><a class="btn secondary" href="{{ url_for('reports.project_status') }}">Clear</a><button class="btn secondary" type="submit" name="export" value="csv">Export CSV</button><button class="btn primary" type="submit">Apply Filters</button></div>
 </form>
-<table class="data-table">
-  <thead><tr><th>Project</th><th>Status</th><th>Tasks</th><th>Done</th><th>Progress</th></tr></thead>
-  <tbody>
-  {% for r in rows %}
-    <tr>
-      <td>{{ r.project }}</td>
-      <td><span class="status-pill status-{{ r.status|lower|replace(' ','') }}">{{ r.status }}</span></td>
-      <td>{{ r.total_tasks }}</td><td>{{ r.done }}</td>
-      <td><div class="bar"><span style="width:{{ r.progress }}%"></span></div>{{ r.progress }}%</td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
+
+<section class="module-kpi-row report-detail-kpis">
+  <div class="module-kpi-card mk-blue"><span class="module-kpi-icon">▥</span><div><span class="module-kpi-label">Projects</span><strong>{{ summary.projects }}</strong><small>Filtered projects</small></div></div>
+  <div class="module-kpi-card mk-green"><span class="module-kpi-icon">↗</span><div><span class="module-kpi-label">Active</span><strong>{{ summary.active }}</strong><small>Currently active</small></div></div>
+  <div class="module-kpi-card mk-violet"><span class="module-kpi-icon">✓</span><div><span class="module-kpi-label">Completed</span><strong>{{ summary.completed }}</strong><small>Completed projects</small></div></div>
+  <div class="module-kpi-card mk-amber"><span class="module-kpi-icon">%</span><div><span class="module-kpi-label">Average Progress</span><strong>{{ summary.avg_progress }}%</strong><small>Task completion</small></div></div>
+</section>
+
+<section class="module-panel report-table-panel">
+  <div class="module-panel-head"><div><h2>Project Results</h2><p>{{ rows|length }} project{{ '' if rows|length == 1 else 's' }} match the current filters</p></div></div>
+  <div class="table-scroll"><table class="data-table report-data-table">
+    <thead><tr><th>Project</th><th>Manager</th><th>Status</th><th>Start</th><th>Target</th><th>Tasks</th><th>Progress</th><th>Open Milestones</th><th>Next Deadline</th></tr></thead>
+    <tbody>{% for r in rows %}<tr>
+      <td><strong>{{ r.project }}</strong></td><td>{{ r.manager }}</td><td><span class="status-pill status-{{ r.status|lower|replace(' ','') }}">{{ r.status }}</span></td>
+      <td>{{ r.start_date.strftime('%b %d, %Y') if r.start_date else '—' }}</td><td>{{ r.target_date.strftime('%b %d, %Y') if r.target_date else '—' }}</td>
+      <td>{{ r.done }} / {{ r.total_tasks }}</td><td><div class="report-progress-cell"><div class="coverage-track"><span style="width:{{ r.progress }}%"></span></div><strong>{{ r.progress }}%</strong></div></td>
+      <td>{{ r.open_milestones }}</td><td>{{ r.next_deadline.strftime('%b %d, %Y') if r.next_deadline else '—' }}</td>
+    </tr>{% else %}<tr><td colspan="9"><div class="empty-state">No projects match the selected filters.</div></td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
 {% endblock %}
