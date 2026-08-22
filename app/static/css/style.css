@@ -3025,3 +3025,349 @@ a.module-kpi-card:hover {
     width: 100%;
   }
 }
+
+
+/* ---------- Competency assessment workflow ---------- */
+.assessment-toolbar {
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.assessment-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.assessment-person > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.assessment-person strong { color: #1f2937; font-size: 13px; }
+.assessment-person small { color: #94a3b8; font-size: 11px; }
+
+.assessment-info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 13px 15px;
+  margin-bottom: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1e3a5f;
+}
+
+.assessment-info-icon {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.assessment-info-banner strong { display: block; margin-bottom: 2px; font-size: 12px; }
+.assessment-info-banner p { color: #475569; font-size: 11px; }
+.assessment-form { display: grid; gap: 16px; }
+
+.assessment-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.assessment-section-head h2 { margin-bottom: 2px; font-size: 16px; }
+.assessment-section-head p { color: #64748b; font-size: 11px; }
+.assessment-card-list { display: grid; gap: 10px; }
+
+.assessment-skill-card {
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.assessment-skill-card.required-skill { border-left: 3px solid #14b8a6; }
+
+.assessment-skill-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+  border-bottom: 1px solid #eef2f7;
+  background: #fbfcfd;
+}
+
+.assessment-skill-head > div { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.assessment-skill-head h3 { color: #1f2937; font-size: 14px; }
+
+.assessment-required-pill,
+.assessment-optional-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.assessment-required-pill { background: #e6f7f5; color: #0f766e; }
+.assessment-optional-pill { background: #f1f5f9; color: #64748b; }
+
+.assessment-fields {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.15fr) minmax(150px, .85fr) minmax(150px, .8fr) minmax(220px, 1.35fr);
+  gap: 12px;
+  padding: 14px 15px;
+}
+
+.assessment-field {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.assessment-field > span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.assessment-field > span em {
+  color: #94a3b8;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.assessment-field select,
+.assessment-field input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #d7dee8;
+  border-radius: 9px;
+  background: #fff;
+  color: #1f2937;
+  font-size: 12px;
+  outline: none;
+}
+
+.assessment-field select:focus,
+.assessment-field input:focus {
+  border-color: #5dc5ba;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, .08);
+}
+
+.assessment-field small { color: #94a3b8; font-size: 9.5px; line-height: 1.35; }
+.assessment-readonly { justify-content: flex-start; padding: 1px 0; }
+.assessment-readonly strong { min-height: 38px; display: flex; align-items: center; color: #334155; font-size: 12px; }
+.assessment-gap-value { color: #b45309 !important; }
+
+.assessment-source {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 15px 12px;
+  border-top: 1px solid #f1f5f9;
+  background: #fcfdfd;
+}
+
+.assessment-source-label {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.assessment-source > div { min-width: 0; }
+.assessment-source strong { color: #334155; font-size: 11px; }
+.assessment-source small { display: block; margin-top: 2px; color: #64748b; font-size: 10px; }
+.assessment-source-sep { margin: 0 5px; color: #94a3b8; }
+.assessment-empty { color: #64748b; font-size: 12px; }
+
+.assessment-additional {
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.assessment-additional > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.assessment-additional > summary::-webkit-details-marker { display: none; }
+.assessment-additional > summary > div { display: flex; flex-direction: column; gap: 2px; }
+.assessment-additional > summary strong { color: #1f2937; font-size: 13px; }
+.assessment-additional > summary span:not(.module-count) { color: #64748b; font-size: 10px; }
+
+.assessment-additional-body {
+  padding: 0 12px 12px;
+  border-top: 1px solid #eef2f7;
+}
+
+.assessment-additional-note { padding: 10px 4px; color: #64748b; font-size: 10px; }
+
+.assessment-save-bar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, .96);
+  border: 1px solid #dce4eb;
+  border-radius: 13px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, .08);
+  backdrop-filter: blur(8px);
+}
+
+.assessment-save-bar > div:first-child { display: flex; flex-direction: column; gap: 1px; }
+.assessment-save-bar strong { color: #334155; font-size: 12px; }
+.assessment-save-bar span { color: #64748b; font-size: 10px; }
+.assessment-save-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+
+@media (max-width: 1180px) {
+  .assessment-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .assessment-fields { grid-template-columns: 1fr; }
+  .assessment-skill-head,
+  .assessment-section-head,
+  .assessment-save-bar { align-items: flex-start; flex-direction: column; }
+  .assessment-save-actions,
+  .assessment-save-actions .btn { width: 100%; }
+  .assessment-source { grid-template-columns: 1fr; }
+}
+
+.summary-no-target {
+  min-height: 150px;
+  margin: 4px auto 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px dashed #d8e0e8;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.summary-no-target strong { font-size: 24px; color: #64748b; }
+.summary-no-target span { font-size: 10px; text-align: center; }
+
+/* ---------- Learning ownership, monitoring and progress workflow ---------- */
+.learning-view-nav {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.learning-view-links {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.learning-view-links .learning-nav-active {
+  border-color: #0d9488;
+  background: #ecfdf5;
+  color: #0f766e;
+  box-shadow: inset 0 0 0 1px rgba(13, 148, 136, .08);
+}
+
+.learning-employee-context {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 7px;
+  color: #334155;
+}
+
+.learning-employee-avatar {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 26px;
+  border: 1px solid #bfe8e2;
+  border-radius: 50%;
+  background: #e8f7f4;
+  color: #0f766e;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.learning-employee-context > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.learning-employee-context strong {
+  color: #334155;
+  font-size: 10.5px;
+}
+
+.learning-employee-context small {
+  color: #94a3b8;
+  font-size: 9px;
+}
+
+.learning-reason {
+  margin-top: 7px;
+  color: #64748b;
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.learning-monitor-label {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+#recommendationEngineButton:disabled {
+  cursor: wait;
+  opacity: .7;
+}
+
+@media (max-width: 620px) {
+  .learning-view-nav,
+  .learning-view-links { justify-content: stretch; }
+  .learning-view-links { width: 100%; }
+  .learning-view-links .btn { flex: 1 1 150px; }
+}

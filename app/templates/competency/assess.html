@@ -1,22 +1,154 @@
 {% extends "base.html" %}
+{% set is_self = emp.user_id == current_user.id %}
+{% block title %}Update Competency Assessment · SPM&ECD{% endblock %}
+{% block page_title %}Update Competency Assessment{% endblock %}
+{% block page_subtitle %}{% if is_self %}Rate your current proficiency. Project targets are applied automatically from your assigned work.{% else %}Record current proficiency for {{ emp.full_name }}. Project targets are applied automatically from assigned work.{% endif %}{% endblock %}
+
+{% macro proficiency_select(item) -%}
+<select class="assessment-level-select" name="current_{{ item.skill.id }}" data-target="{{ item.target or '' }}" aria-label="Current proficiency for {{ item.skill.name }}">
+  <option value="">Not Assessed</option>
+  {% for level, label in [(1, 'Beginner'), (2, 'Basic'), (3, 'Intermediate'), (4, 'Advanced'), (5, 'Expert')] %}
+    <option value="{{ level }}" {% if item.assessment and item.assessment.current_level == level %}selected{% endif %}>{{ level }} — {{ label }}</option>
+  {% endfor %}
+</select>
+{%- endmacro %}
+
+{% macro assessment_card(item, required=True) -%}
+<article class="assessment-skill-card {% if required %}required-skill{% endif %}">
+  <div class="assessment-skill-head">
+    <div>
+      <h3>{{ item.skill.name }}</h3>
+      <span class="category-badge category-{{ (item.skill.category or 'general')|lower|replace(' ', '-') }}">{{ item.skill.category or 'General' }}</span>
+    </div>
+    {% if required %}<span class="assessment-required-pill">Required for active work</span>{% else %}<span class="assessment-optional-pill">Additional competency</span>{% endif %}
+  </div>
+
+  <div class="assessment-fields">
+    <label class="assessment-field">
+      <span>Current Proficiency</span>
+      {{ proficiency_select(item) }}
+      <small>{% if item.assessment and item.assessment.assessed_on %}Last assessed {{ item.assessment.assessed_on.strftime('%b %d, %Y') }}{% else %}No assessment recorded yet{% endif %}</small>
+    </label>
+
+    <div class="assessment-field assessment-readonly">
+      <span>Project Target</span>
+      {% if item.target %}
+        <strong>Level {{ item.target }}</strong>
+        <small>Derived from assigned active task requirements</small>
+      {% else %}
+        <strong>No active target</strong>
+        <small>This skill is not currently required by assigned active work</small>
+      {% endif %}
+    </div>
+
+    <div class="assessment-field assessment-readonly">
+      <span>Current Gap</span>
+      {% if item.target %}
+        <strong class="assessment-gap-value" data-gap-for="{{ item.skill.id }}" data-target="{{ item.target }}">{% if item.gap is none %}Not assessed{% elif item.gap > 0 %}{{ item.gap }} level{{ '' if item.gap == 1 else 's' }}{% else %}Meets target{% endif %}</strong>
+        <small>Calculated automatically from current proficiency vs target</small>
+      {% else %}
+        <strong>—</strong>
+        <small>No gap is generated without an active project target</small>
+      {% endif %}
+    </div>
+
+    <label class="assessment-field assessment-notes">
+      <span>Notes <em>optional</em></span>
+      <input type="text" name="notes_{{ item.skill.id }}" value="{{ item.assessment.notes if item.assessment and item.assessment.notes else '' }}" placeholder="Add assessment context or evidence">
+    </label>
+  </div>
+
+  {% if required %}
+  <div class="assessment-source">
+    <span class="assessment-source-label">Required by</span>
+    <div>
+      {% for project in item.projects %}<strong>{{ project }}</strong>{% if not loop.last %}<span class="assessment-source-sep">•</span>{% endif %}{% endfor %}
+      <small>{% for task in item.tasks %}{{ task.task_title }} (Level {{ task.required_level }}){% if not loop.last %} · {% endif %}{% endfor %}</small>
+    </div>
+  </div>
+  {% endif %}
+</article>
+{%- endmacro %}
+
 {% block content %}
-<h2>Competency Assessment — {{ emp.full_name }}</h2>
-<p class="muted">Set current proficiency (1–5) and required level (1–5) per skill. The system computes gaps for the recommendation engine.</p>
-<form method="POST" action="{{ url_for('competency.assess', employee_id=emp.id) }}">
-  <table class="data-table">
-    <thead><tr><th>Skill</th><th>Category</th><th>Current (1–5)</th><th>Required (1–5)</th><th>Notes</th></tr></thead>
-    <tbody>
-    {% for s in skills %}
-      {% set a = assessments | selectattr('skill_id','equalto', s.id) | first %}
-      <tr>
-        <td>{{ s.name }}</td><td>{{ s.category }}</td>
-        <td><input type="number" name="current_{{ s.id }}" min="1" max="5" value="{{ a.current_level if a else 1 }}" class="num"></td>
-        <td><input type="number" name="required_{{ s.id }}" min="1" max="5" value="{{ a.required_level if a else 3 }}" class="num"></td>
-        <td><input type="text" name="notes_{{ s.id }}" value="{% if a %}{{ a.notes }}{% endif %}" placeholder="—"></td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  <button class="btn primary" type="submit">Save Assessment</button>
+<div class="module-toolbar assessment-toolbar">
+  <div class="assessment-person">
+    <span class="employee-avatar-sm">{{ emp.full_name[:1] }}</span>
+    <div><strong>{{ emp.full_name }}</strong><small>{{ emp.position or 'Employee' }}{% if emp.team %} · {{ emp.team }}{% endif %}</small></div>
+  </div>
+  <div class="module-toolbar-actions">
+    <a class="btn secondary" href="{{ url_for('competency.employee_profile', employee_id=emp.id) }}">Cancel</a>
+  </div>
+</div>
+
+<div class="assessment-info-banner">
+  <span class="assessment-info-icon">i</span>
+  <div>
+    <strong>Targets are project-driven</strong>
+    <p>You only record current proficiency. Required levels come from active tasks assigned to this employee, keeping competency gaps and learning recommendations aligned with project needs.</p>
+  </div>
+</div>
+
+<form method="POST" action="{{ url_for('competency.assess', employee_id=emp.id) }}" class="assessment-form">
+  <section class="assessment-section">
+    <div class="assessment-section-head">
+      <div>
+        <h2>Required for Active Projects</h2>
+        <p>{{ required_items|length }} competenc{{ 'y' if required_items|length == 1 else 'ies' }} currently required by assigned active work</p>
+      </div>
+      <span class="module-count">Project-derived targets</span>
+    </div>
+
+    {% if required_items %}
+      <div class="assessment-card-list">
+        {% for item in required_items %}{{ assessment_card(item, True) }}{% endfor %}
+      </div>
+    {% else %}
+      <div class="module-panel empty-state assessment-empty">No active project tasks currently define competency targets for this employee. Existing competencies can still be updated below.</div>
+    {% endif %}
+  </section>
+
+  <details class="assessment-additional" {% if not required_items %}open{% endif %}>
+    <summary>
+      <div><strong>Additional Competencies</strong><span>Track skills that are not currently required by assigned active work</span></div>
+      <span class="module-count">{{ optional_items|length }}</span>
+    </summary>
+    <div class="assessment-additional-body">
+      <p class="assessment-additional-note">These proficiency records remain part of the employee profile, but they do not create a competency gap or learning recommendation until an active project/task requires the skill.</p>
+      <div class="assessment-card-list">
+        {% for item in optional_items %}{{ assessment_card(item, False) }}{% endfor %}
+      </div>
+    </div>
+  </details>
+
+  <div class="assessment-save-bar">
+    <div><strong>Assessment ready to save?</strong><span>Only recorded proficiency is editable; project target levels remain system-derived.</span></div>
+    <div class="assessment-save-actions">
+      <a class="btn secondary" href="{{ url_for('competency.employee_profile', employee_id=emp.id) }}">Cancel</a>
+      <button class="btn primary" type="submit">Save Assessment</button>
+    </div>
+  </div>
 </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const gapLabel = (current, target) => {
+    if (!current) return 'Not assessed';
+    const gap = Math.max(0, Number(target) - Number(current));
+    return gap === 0 ? 'Meets target' : `${gap} level${gap === 1 ? '' : 's'}`;
+  };
+
+  document.querySelectorAll('.assessment-level-select[data-target]').forEach(select => {
+    const target = select.dataset.target;
+    if (!target) return;
+    const output = document.querySelector(`[data-gap-for="${select.name.replace('current_', '')}"]`);
+    if (!output) return;
+    const refresh = () => { output.textContent = gapLabel(select.value, target); };
+    select.addEventListener('change', refresh);
+    refresh();
+  });
+})();
+</script>
 {% endblock %}

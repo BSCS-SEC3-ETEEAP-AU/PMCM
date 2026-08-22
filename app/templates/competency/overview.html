@@ -10,6 +10,7 @@
     <input id="competencySearch" class="module-search" type="search" placeholder="Search employees, positions or teams..." aria-label="Search team competencies">
   </div>
   <div class="module-toolbar-actions">
+    <a class="btn secondary" href="{{ url_for('competency.my_profile') }}">My Competencies</a>
     <a class="btn secondary" href="{{ url_for('competency.list_skills') }}">Skills Catalog</a>
     <a class="btn primary" href="{{ url_for('competency.gap_report') }}">View Gap Analysis</a>
   </div>
@@ -38,7 +39,7 @@
   <div class="module-panel-head">
     <div>
       <h2>Employee Competency Overview</h2>
-      <p>Target coverage compares recorded proficiency with the employee's current target levels.</p>
+      <p>Target coverage compares recorded proficiency with active project/task requirements.</p>
     </div>
   </div>
   <div class="table-wrap">
@@ -82,11 +83,19 @@
               <span class="status-pill status-completed">Meets Target</span>
             {% elif row.status == 'Has Gaps' %}
               <span class="status-pill status-in-review">Has Gaps</span>
+            {% elif row.status == 'Assessment Needed' %}
+              <span class="status-pill status-not-started">Assessment Needed</span>
             {% else %}
-              <span class="status-pill status-not-started">Not Assessed</span>
+              <span class="status-pill status-not-started">No Active Targets</span>
             {% endif %}
           </td>
-          <td><a class="btn small" href="{{ url_for('competency.employee_profile', employee_id=row.employee.id) }}">View Profile</a></td>
+          <td>
+            {% if row.employee.user_id == current_user.id %}
+              <a class="btn small" href="{{ url_for('competency.my_profile') }}">My Profile</a>
+            {% else %}
+              <a class="btn small" href="{{ url_for('competency.employee_profile', employee_id=row.employee.id) }}">View Profile</a>
+            {% endif %}
+          </td>
         </tr>
       {% else %}
         <tr><td colspan="7" class="muted">No employee profiles are available.</td></tr>

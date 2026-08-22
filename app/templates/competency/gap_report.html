@@ -1,15 +1,26 @@
 {% extends "base.html" %}
+{% block title %}Gap Analysis · SPM&ECD{% endblock %}
+{% block page_title %}Competency Gap Analysis{% endblock %}
+{% block page_subtitle %}Review current proficiency against active project/task requirements{% endblock %}
 {% block content %}
-<h2>Competency Gap Analysis (Org-wide)</h2>
-<p class="muted">Current vs required proficiency across all assessments. Sorted by largest gap first — feeds the recommendation engine.</p>
+<div class="module-toolbar">
+  <div></div>
+  <div class="module-toolbar-actions">
+    <a class="btn secondary" href="{{ url_for('competency.my_profile') }}">My Competencies</a>
+    <a class="btn secondary" href="{{ url_for('competency.overview') }}">Team Competencies</a>
+    <a class="btn secondary" href="{{ url_for('competency.list_skills') }}">Skills Catalog</a>
+  </div>
+</div>
+<p class="muted">Targets come from active assigned project tasks. Employees without a recorded proficiency remain pending assessment and do not receive learning recommendations yet.</p>
 <table class="data-table">
-  <thead><tr><th>Employee</th><th>Team</th><th>Skill</th><th>Current</th><th>Required</th><th>Gap</th></tr></thead>
+  <thead><tr><th>Employee</th><th>Team</th><th>Skill</th><th>Current</th><th>Project Target</th><th>Gap</th><th>Required By</th></tr></thead>
   <tbody>
   {% for r in rows %}
     <tr>
       <td>{{ r.employee }}</td><td>{{ r.team }}</td><td>{{ r.skill }}</td>
-      <td>{{ r.current }}</td><td>{{ r.required }}</td>
-      <td>{% if r.gap > 0 %}<span class="gap-badge">{{ r.gap }}</span>{% else %}—{% endif %}</td>
+      <td>{% if r.current is none %}<span class="status-pill status-not-started">Not Assessed</span>{% else %}Level {{ r.current }}{% endif %}</td><td><strong>Level {{ r.required }}</strong></td>
+      <td>{% if r.gap is none %}<span class="muted">Pending</span>{% elif r.gap > 0 %}<span class="gap-badge">{{ r.gap }}</span>{% else %}<span class="gap-badge gap-zero">0</span>{% endif %}</td>
+      <td>{{ r.projects|join(', ') }}</td>
     </tr>
   {% endfor %}
   </tbody>

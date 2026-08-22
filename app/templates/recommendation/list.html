@@ -1,14 +1,24 @@
 {% extends "base.html" %}
-{% block page_title %}{% if own %}My Learning Recommendations{% else %}Learning Recommendations{% endif %}{% endblock %}
-{% block page_subtitle %}Rule-based learning suggestions generated from recorded competency gaps{% endblock %}
+{% block page_title %}{% if own %}My Learning{% else %}Team Learning{% endif %}{% endblock %}
+{% block page_subtitle %}{% if own %}Track learning activities recommended from your active competency gaps{% else %}Monitor competency-based learning recommendations and progress across the team{% endif %}{% endblock %}
 {% block content %}
+{% if current_user.role in ('admin','manager') %}
+<section class="learning-view-nav">
+  <div class="learning-view-links">
+    <a class="btn secondary {% if view_mode == 'my' %}learning-nav-active{% endif %}" href="{{ url_for('recommendation.my_recommendations', view='my') }}">My Learning</a>
+    <a class="btn secondary {% if view_mode == 'team' %}learning-nav-active{% endif %}" href="{{ url_for('recommendation.my_recommendations', view='team') }}">Team Learning</a>
+    <a class="btn secondary" href="{{ url_for('recommendation.list_resources') }}">Learning Resource Repository</a>
+    <a class="btn secondary" href="{{ url_for('competency.gap_report') }}">Competency Gap Report</a>
+  </div>
+</section>
+{% endif %}
+
 <section class="module-toolbar learning-toolbar">
-  <div class="module-info-banner"><span>i</span><p>Recommendations are based on competency gaps and the Learning Resource Repository. No AI or machine learning is used.</p></div>
-  {% if current_user.role in ('admin','manager') %}
-  <form method="POST" action="{{ url_for('recommendation.generate') }}">
-    <button class="btn" type="submit">↻ Run Recommendation Engine</button>
+  <div class="module-info-banner"><span>i</span><p>{% if own %}Your recommendations refresh automatically from active project competency gaps when My Learning opens. You can also refresh them manually. Completing a resource records learning progress; proficiency changes only after reassessment.{% else %}Team recommendations are generated from active project competency gaps. Managers can refresh team recommendations and monitor progress, while each employee controls the status of their own learning activities.{% endif %}</p></div>
+  <form id="recommendationEngineForm" method="POST" action="{{ url_for('recommendation.generate') }}">
+    <input type="hidden" name="scope" value="{{ 'my' if own else 'team' }}">
+    <button id="recommendationEngineButton" class="btn" type="submit">↻ {% if own %}Refresh My Recommendations{% else %}Refresh Team Recommendations{% endif %}</button>
   </form>
-  {% endif %}
 </section>
 
 <section class="learning-list">
@@ -19,6 +29,12 @@
       {% if r.resource.resource_type == 'Certification' %}◆{% elif r.resource.resource_type == 'Article' %}▤{% else %}▣{% endif %}
     </div>
     <div class="learning-main">
+      {% if not own %}
+      <div class="learning-employee-context">
+        <span class="learning-employee-avatar">{{ (r.employee.full_name or '?')[:1]|upper }}</span>
+        <span><strong>{{ r.employee.full_name }}</strong><small>{{ r.employee.position or 'Employee' }}{% if r.employee.team %} · {{ r.employee.team }}{% endif %}</small></span>
+      </div>
+      {% endif %}
       <div class="learning-title-row">
         <div>
           <h2>{{ r.resource.title }}</h2>
@@ -33,6 +49,7 @@
         <span>Provider: {{ r.resource.provider or 'Not specified' }}</span>
         <span>Access: {{ r.resource.access_type or 'Not specified' }}</span>
       </div>
+      {% if r.reason %}<p class="learning-reason">{{ r.reason }}</p>{% endif %}
     </div>
     <div class="learning-meta">
       <span>Priority</span>
@@ -44,20 +61,33 @@
     </div>
     <div class="learning-actions">
       {% if r.resource.url %}<a class="btn secondary small" href="{{ r.resource.url }}" target="_blank" rel="noopener">Open Resource</a>{% endif %}
-      {% if r.status != 'Completed' %}
-      <form method="POST" action="{{ url_for('recommendation.complete', rec_id=r.id) }}"><button class="btn small" type="submit">Mark Complete</button></form>
-      {% else %}<span class="completed-label">✓ Completed</span>{% endif %}
+      {% if own %}
+        {% if r.status == 'Recommended' %}
+        <form method="POST" action="{{ url_for('recommendation.start', rec_id=r.id) }}"><button class="btn small" type="submit">Start Learning</button></form>
+        {% elif r.status == 'In Progress' %}
+        <form method="POST" action="{{ url_for('recommendation.complete', rec_id=r.id) }}"><button class="btn small" type="submit">Mark Completed</button></form>
+        {% elif r.status == 'Completed' %}
+        <span class="completed-label">✓ Completed{% if r.completed_at %} {{ r.completed_at.strftime('%b %d, %Y') }}{% endif %}</span>
+        {% endif %}
+      {% else %}
+      <span class="learning-monitor-label">Monitoring only</span>
+      {% endif %}
     </div>
   </article>
   {% else %}
-  <div class="empty-state learning-empty">No recommendations yet. Complete competency assessments first{% if current_user.role in ('admin','manager') %}, then run the recommendation engine{% endif %}.</div>
+  <div class="empty-state learning-empty">{% if own %}No active learning recommendations are available for your current competency gaps.{% else %}No team learning recommendations are available. Run the recommendation engine after competency assessments and project requirements are recorded.{% endif %}</div>
   {% endfor %}
 </section>
 
-{% if current_user.role in ('admin','manager') %}
-<div class="module-footer-actions">
-  <a class="btn secondary" href="{{ url_for('recommendation.list_resources') }}">Learning Resource Repository</a>
-  <a class="btn secondary" href="{{ url_for('competency.gap_report') }}">Competency Gap Report</a>
-</div>
-{% endif %}
+<script>
+(() => {
+  const form = document.getElementById('recommendationEngineForm');
+  const button = document.getElementById('recommendationEngineButton');
+  if (!form || !button) return;
+  form.addEventListener('submit', () => {
+    button.disabled = true;
+    button.textContent = 'Refreshing…';
+  });
+})();
+</script>
 {% endblock %}

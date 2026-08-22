@@ -6,10 +6,12 @@ computes current vs required gaps that feed the recommendation engine.
 """
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
+from datetime import date
 from ..models import (
     db, Employee, Skill, Certification, CompetencyAssessment, User,
 )
 from ..decorators import manager_required, admin_required
+from ..competency_rules import active_project_requirements
 
 competency_bp = Blueprint("competency", __name__, url_prefix="/competency")
 
@@ -33,7 +35,7 @@ def _enforce_employee_scope(employee_id):
 @competency_bp.route("/me")
 @login_required
 def my_profile():
-    """Safe shortcut for employees to open their own competency profile."""
+    """Open the competency profile linked to the signed-in user, regardless of role."""
     emp = _current_employee()
     if not emp:
         flash("No competency profile is linked to your account.", "warning")
@@ -44,7 +46,7 @@ def my_profile():
 @competency_bp.route("/overview")
 @manager_required
 def overview():
-    """Manager-facing competency overview for workforce development monitoring."""
+    """Manager-facing competency overview using active project targets."""
     employees = Employee.query.order_by(Employee.full_name).all()
     assessments = CompetencyAssessment.query.all()
     certifications = Certification.query.all()
@@ -66,10 +68,25 @@ def overview():
 
     for employee in employees:
         employee_assessments = assessments_by_employee.get(employee.id, [])
+        assessment_map = {assessment.skill_id: assessment for assessment in employee_assessments}
+        requirements = active_project_requirements(employee.id)
         assessed_count = len(employee_assessments)
-        gap_count = sum(1 for assessment in employee_assessments if assessment.gap > 0)
-        meets_target = assessed_count - gap_count
-        coverage = round((meets_target / assessed_count) * 100) if assessed_count else None
+        gap_count = 0
+        meets_target = 0
+        unassessed_required = 0
+
+        for skill_id, requirement in requirements.items():
+            assessment = assessment_map.get(skill_id)
+            target = requirement["required_level"]
+            if not assessment:
+                unassessed_required += 1
+            elif assessment.current_level >= target:
+                meets_target += 1
+            else:
+                gap_count += 1
+
+        required_count = len(requirements)
+        coverage = round((meets_target / required_count) * 100) if required_count else None
 
         if assessed_count:
             assessed_employees += 1
@@ -77,17 +94,24 @@ def overview():
             employees_with_gaps += 1
         total_gaps += gap_count
 
+        if unassessed_required:
+            status = "Assessment Needed"
+        elif gap_count:
+            status = "Has Gaps"
+        elif required_count:
+            status = "Meets Target"
+        else:
+            status = "No Active Targets"
+
         rows.append({
             "employee": employee,
             "competencies": assessed_count,
             "gaps": gap_count,
             "coverage": coverage,
             "certifications": certifications_by_employee.get(employee.id, 0),
-            "status": (
-                "Not Assessed" if assessed_count == 0
-                else "Meets Target" if gap_count == 0
-                else "Has Gaps"
-            ),
+            "required": required_count,
+            "unassessed_required": unassessed_required,
+            "status": status,
         })
 
     summary = {
@@ -125,54 +149,131 @@ def employee_profile(employee_id):
     emp = Employee.query.get_or_404(employee_id)
     certs = Certification.query.filter_by(employee_id=employee_id).order_by(Certification.issued_date.desc()).all()
     assessments = CompetencyAssessment.query.filter_by(employee_id=employee_id).all()
+    assessment_map = {assessment.skill_id: assessment for assessment in assessments}
+    requirements = active_project_requirements(employee_id)
     skills = Skill.query.order_by(Skill.name).all()
-    total = len(assessments)
-    gaps = sum(1 for assessment in assessments if assessment.gap > 0)
-    meets_target = total - gaps
+
+    competency_rows = []
+    for skill in skills:
+        assessment = assessment_map.get(skill.id)
+        requirement = requirements.get(skill.id)
+        if not assessment and not requirement:
+            continue
+        target = requirement["required_level"] if requirement else None
+        gap = None if not assessment or target is None else max(0, target - assessment.current_level)
+        competency_rows.append({
+            "skill": skill,
+            "assessment": assessment,
+            "target": target,
+            "gap": gap,
+            "projects": requirement["projects"] if requirement else [],
+            "tasks": requirement["tasks"] if requirement else [],
+        })
+
+    required_count = len(requirements)
+    meets_target = sum(
+        1 for row in competency_rows
+        if row["target"] is not None and row["assessment"] and row["assessment"].current_level >= row["target"]
+    )
+    gaps = sum(1 for row in competency_rows if row["gap"] is not None and row["gap"] > 0)
+    unassessed_required = sum(
+        1 for row in competency_rows if row["target"] is not None and not row["assessment"]
+    )
     assessment_summary = {
-        "total": total,
+        "total": len(assessments),
+        "required": required_count,
         "gaps": gaps,
+        "unassessed_required": unassessed_required,
         "meets_target": meets_target,
         "high": sum(1 for assessment in assessments if assessment.current_level >= 4),
-        "coverage": round(100 * meets_target / total) if total else 0,
+        "coverage": round(100 * meets_target / required_count) if required_count else None,
     }
     return render_template(
         "competency/profile.html",
         emp=emp, certs=certs, assessments=assessments, skills=skills,
-        assessment_summary=assessment_summary,
+        competency_rows=competency_rows, assessment_summary=assessment_summary,
     )
 
 
 @competency_bp.route("/employees/<int:employee_id>/assess", methods=["GET", "POST"])
 @login_required
 def assess(employee_id):
-    """Employees complete their own assessment; Manager/Admin may record any."""
+    """Record current proficiency while project work supplies target levels."""
     _enforce_employee_scope(employee_id)
     emp = Employee.query.get_or_404(employee_id)
     skills = Skill.query.order_by(Skill.name).all()
+    assessments = CompetencyAssessment.query.filter_by(employee_id=employee_id).all()
+    assessment_map = {assessment.skill_id: assessment for assessment in assessments}
+    requirements = active_project_requirements(employee_id)
 
     if request.method == "POST":
+        saved = 0
         for skill in skills:
-            current_level = int(request.form.get(f"current_{skill.id}", 1))
-            required_level = int(request.form.get(f"required_{skill.id}", 3))
-            notes = request.form.get(f"notes_{skill.id}", "")
-            existing = CompetencyAssessment.query.filter_by(
-                employee_id=employee_id, skill_id=skill.id
-            ).first()
+            raw_current = (request.form.get(f"current_{skill.id}") or "").strip()
+            existing = assessment_map.get(skill.id)
+            requirement = requirements.get(skill.id)
+
+            if not raw_current:
+                if existing:
+                    existing.required_level = (
+                        requirement["required_level"] if requirement else existing.current_level
+                    )
+                continue
+
+            try:
+                current_level = int(raw_current)
+            except ValueError:
+                flash(f"Select a valid proficiency level for {skill.name}.", "warning")
+                return redirect(url_for("competency.assess", employee_id=employee_id))
+            if current_level not in range(1, 6):
+                flash(f"Proficiency for {skill.name} must be between Level 1 and Level 5.", "warning")
+                return redirect(url_for("competency.assess", employee_id=employee_id))
+
+            target_level = requirement["required_level"] if requirement else current_level
+            notes = request.form.get(f"notes_{skill.id}", "").strip()
             if existing:
                 existing.current_level = current_level
-                existing.required_level = required_level
+                existing.required_level = target_level
                 existing.notes = notes
+                existing.assessed_on = date.today()
             else:
                 db.session.add(CompetencyAssessment(
                     employee_id=employee_id, skill_id=skill.id,
-                    current_level=current_level, required_level=required_level,
-                    notes=notes,
+                    current_level=current_level, required_level=target_level,
+                    assessed_on=date.today(), notes=notes,
                 ))
+            saved += 1
+
         db.session.commit()
-        flash("Competency assessment saved.", "success")
+        if saved:
+            flash("Competency assessment saved. Project targets were applied automatically.", "success")
+        else:
+            flash("No proficiency changes were submitted.", "info")
         return redirect(url_for("competency.employee_profile", employee_id=employee_id))
-    return render_template("competency/assess.html", emp=emp, skills=skills)
+
+    required_items = []
+    optional_items = []
+    for skill in skills:
+        assessment = assessment_map.get(skill.id)
+        requirement = requirements.get(skill.id)
+        target = requirement["required_level"] if requirement else None
+        item = {
+            "skill": skill,
+            "assessment": assessment,
+            "target": target,
+            "gap": None if not assessment or target is None else max(0, target - assessment.current_level),
+            "projects": requirement["projects"] if requirement else [],
+            "tasks": requirement["tasks"] if requirement else [],
+        }
+        if requirement:
+            required_items.append(item)
+        else:
+            optional_items.append(item)
+
+    return render_template(
+        "competency/assess.html", emp=emp,
+        required_items=required_items, optional_items=optional_items,
+    )
 
 
 @competency_bp.route("/employees/<int:employee_id>/cert/add", methods=["POST"])
@@ -219,19 +320,31 @@ def add_skill():
 @competency_bp.route("/gap-report")
 @manager_required
 def gap_report():
-    """Organization-wide competency gap analysis for Manager/Admin."""
-    assessments = CompetencyAssessment.query.all()
+    """Organization-wide gap analysis against active project/task requirements."""
     rows = []
-    for a in assessments:
-        rows.append({
-            "employee": a.employee.full_name,
-            "team": a.employee.team,
-            "skill": a.skill.name,
-            "current": a.current_level,
-            "required": a.required_level,
-            "gap": a.gap,
-        })
-    rows.sort(key=lambda r: r["gap"], reverse=True)
+    employees = Employee.query.order_by(Employee.full_name).all()
+    for employee in employees:
+        assessment_map = {
+            assessment.skill_id: assessment
+            for assessment in CompetencyAssessment.query.filter_by(employee_id=employee.id).all()
+        }
+        requirements = active_project_requirements(employee.id)
+        if not requirements:
+            continue
+        skills = {skill.id: skill for skill in Skill.query.filter(Skill.id.in_(list(requirements))).all()}
+        for skill_id, requirement in requirements.items():
+            assessment = assessment_map.get(skill_id)
+            target = requirement["required_level"]
+            rows.append({
+                "employee": employee.full_name,
+                "team": employee.team,
+                "skill": skills[skill_id].name if skill_id in skills else "Unknown skill",
+                "current": assessment.current_level if assessment else None,
+                "required": target,
+                "gap": max(0, target - assessment.current_level) if assessment else None,
+                "projects": requirement["projects"],
+            })
+    rows.sort(key=lambda row: (row["gap"] is None, -(row["gap"] or 0), row["employee"], row["skill"]))
     return render_template("competency/gap_report.html", rows=rows)
 
 

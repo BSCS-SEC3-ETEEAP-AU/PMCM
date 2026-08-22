@@ -31,12 +31,12 @@
           <span>Projects</span>
         </a>
         {% if current_user.role == 'admin' %}
-        <a class="{% if request.endpoint and request.endpoint.startswith('competency.') and 'skills' not in request.endpoint and 'gap' not in request.endpoint and 'overview' not in request.endpoint %}active{% endif %}"
+        <a class="{% if request.endpoint == 'competency.list_employees' %}active{% endif %}"
           href="{{ url_for('competency.list_employees') }}">
           <span class="nav-ico">◌</span>
           <span>Team</span>
         </a>
-        <a class="{% if request.endpoint and request.endpoint.startswith('competency.') and ('skills' in request.endpoint or 'gap' in request.endpoint or 'overview' in request.endpoint) %}active{% endif %}"
+        <a class="{% if request.endpoint and request.endpoint.startswith('competency.') and request.endpoint != 'competency.list_employees' %}active{% endif %}"
           href="{{ url_for('competency.list_skills') }}">
           <span class="nav-ico">◎</span>
           <span>Competencies</span>

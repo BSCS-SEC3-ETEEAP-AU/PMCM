@@ -48,9 +48,22 @@ with app.app_context():
         db.session.add(e)
     db.session.commit()
 
-    # Link managers to employee profiles so they can also view/assess as staff
-    employees[2].user_id = users["mgr1"].id   # Anna Reyes (Data Engineer)
-    employees[0].user_id = users["mgr2"].id   # Maria Santos (Software Engineer)
+    # Privileged accounts are still employees: role controls permissions,
+    # while Employee holds the person's own competency identity.
+    role_profiles = {}
+    role_profile_teams = {
+        "admin": "IT Architecture & Data Engineering",
+        "mgr1": "Data Engineering",
+        "mgr2": "IT Architecture & Data Engineering",
+    }
+    for key, team in role_profile_teams.items():
+        user = users[key]
+        profile = Employee(
+            user_id=user.id, full_name=user.full_name, position=user.position,
+            team=team, work_mode=user.work_mode,
+        )
+        role_profiles[key] = profile
+        db.session.add(profile)
     db.session.commit()
 
     # Dedicated employee account (role-restricted views)
@@ -92,6 +105,19 @@ with app.app_context():
             employee_id=employees[ei].id, skill_id=skills[sk].id,
             current_level=cur, required_level=req,
             assessed_on=date.today() - timedelta(days=10),
+        ))
+
+    # Personal competency records for Administrator / Project Managers.
+    role_assess_map = [
+        ("admin", "Communication", 4, 4), ("admin", "Agile/Scrum", 3, 4), ("admin", "SQL", 3, 3),
+        ("mgr1", "Communication", 4, 5), ("mgr1", "Agile/Scrum", 4, 4), ("mgr1", "SQL", 3, 4),
+        ("mgr2", "Communication", 4, 5), ("mgr2", "Agile/Scrum", 4, 4), ("mgr2", "SQL", 3, 4),
+    ]
+    for key, sk, cur, req in role_assess_map:
+        db.session.add(CompetencyAssessment(
+            employee_id=role_profiles[key].id, skill_id=skills[sk].id,
+            current_level=cur, required_level=req,
+            assessed_on=date.today() - timedelta(days=7),
         ))
     db.session.commit()
 
@@ -157,13 +183,13 @@ with app.app_context():
 
     # ---- Learning resources (repository) ----
     resources = [
-        ("Advanced Python for Data", "Deep dive into Python data tooling.", "Python", 5, "Course", "Internal Learning Catalog", "Internal", ""),
-        ("React Patterns & Hooks", "Modern React development.", "React", 4, "Course", "Internal Learning Catalog", "Internal", ""),
-        ("AWS Data Engineering Path", "Build pipelines on AWS.", "Cloud (AWS)", 4, "Course", "Internal Learning Catalog", "Internal", ""),
-        ("Data Pipeline Orchestration", "Airflow & orchestration basics.", "Data Pipelines", 4, "Article", "Internal Knowledge Base", "Internal", ""),
-        ("Tableau Dashboards", "Build executive dashboards.", "Data Visualization", 4, "Course", "Internal Learning Catalog", "Internal", ""),
-        ("Effective Stakeholder Communication", "Communication skills for IT.", "Communication", 4, "Article", "Internal Learning Catalog", "Internal", ""),
-        ("Professional Scrum Master", "Agile/Scrum certification prep.", "Agile/Scrum", 4, "Certification", "Internal Learning Catalog", "Internal", ""),
+        ("Advanced Python for Data", "Deep dive into Python data tooling.", "Python", 5, "Course", "LinkedIn Learning", "Company Subscription", "https://www.linkedin.com/learning/search?keywords=advanced%20python%20data"),
+        ("React Patterns & Hooks", "Modern React development.", "React", 4, "Course", "React Documentation", "External", "https://react.dev/learn"),
+        ("AWS Data Engineering Path", "Build pipelines on AWS.", "Cloud (AWS)", 4, "Course", "AWS Skill Builder", "External", "https://skillbuilder.aws/"),
+        ("Data Pipeline Orchestration", "Airflow & orchestration basics.", "Data Pipelines", 4, "Article", "Apache Airflow Documentation", "External", "https://airflow.apache.org/docs/apache-airflow/stable/"),
+        ("Tableau Dashboards", "Build executive dashboards.", "Data Visualization", 4, "Course", "Tableau Learning", "External", "https://www.tableau.com/learn/training"),
+        ("Effective Stakeholder Communication", "Communication skills for IT.", "Communication", 4, "Article", "LinkedIn Learning", "Company Subscription", "https://www.linkedin.com/learning/search?keywords=stakeholder%20communication"),
+        ("Professional Scrum Master Advanced Preparation", "Advanced Scrum leadership and certification preparation.", "Agile/Scrum", 5, "Certification", "Scrum.org", "External", "https://www.scrum.org/professional-scrum-master-certification"),
     ]
     for title, desc, sk, lvl, rtype, provider, access_type, url in resources:
         db.session.add(LearningResource(

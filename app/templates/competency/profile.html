@@ -1,7 +1,19 @@
 {% extends "base.html" %}
-{% block page_title %}Competency Profile{% endblock %}
-{% block page_subtitle %}View employee proficiency, competency gaps and professional certifications{% endblock %}
+{% set is_self = emp.user_id == current_user.id %}
+{% block title %}{% if is_self %}My Competencies{% else %}Competency Profile{% endif %} · SPM&ECD{% endblock %}
+{% block page_title %}{% if is_self %}My Competencies{% else %}Competency Profile{% endif %}{% endblock %}
+{% block page_subtitle %}{% if is_self %}Review your proficiency, competency gaps and professional certifications{% else %}View employee proficiency, competency gaps and professional certifications{% endif %}{% endblock %}
 {% block content %}
+{% if current_user.role in ('admin', 'manager') %}
+<div class="module-toolbar">
+  <div></div>
+  <div class="module-toolbar-actions">
+    {% if not is_self %}<a class="btn secondary" href="{{ url_for('competency.my_profile') }}">My Competencies</a>{% endif %}
+    <a class="btn secondary" href="{{ url_for('competency.overview') }}">Team Competencies</a>
+    <a class="btn secondary" href="{{ url_for('competency.list_skills') }}">Skills Catalog</a>
+  </div>
+</div>
+{% endif %}
 <section class="profile-hero module-panel">
   <div class="profile-identity">
     <div class="profile-avatar">{{ emp.full_name[:1] }}</div>
@@ -28,28 +40,34 @@
   <div class="profile-grid">
     <article class="module-panel module-table-panel">
       <div class="module-panel-head">
-        <div><h2>Competency Assessment</h2><p>Current proficiency compared with the recorded target level</p></div>
+        <div><h2>Competency Assessment</h2><p>Current proficiency compared with active project/task target levels</p></div>
         <a class="btn small" href="{{ url_for('competency.assess', employee_id=emp.id) }}">Update Assessment</a>
       </div>
       <div class="table-wrap">
         <table class="module-table competency-table">
-          <thead><tr><th>Competency</th><th>Proficiency Level</th><th>Last Assessed</th><th>Target</th><th>Gap</th></tr></thead>
+          <thead><tr><th>Competency</th><th>Proficiency Level</th><th>Last Assessed</th><th>Project Target</th><th>Gap</th><th>Required By</th></tr></thead>
           <tbody>
-          {% for a in assessments %}
+          {% for row in competency_rows %}
+            {% set a = row.assessment %}
             <tr>
-              <td><strong>{{ a.skill.name }}</strong><small class="module-cell-sub">{{ a.skill.category or 'General' }}</small></td>
+              <td><strong>{{ row.skill.name }}</strong><small class="module-cell-sub">{{ row.skill.category or 'General' }}</small></td>
               <td>
-                <span class="proficiency-stars" aria-label="Level {{ a.current_level }} of 5">
-                  {% for i in range(1, 6) %}<span class="{% if i <= a.current_level %}filled{% endif %}">★</span>{% endfor %}
-                </span>
-                <small class="level-text">Level {{ a.current_level }}</small>
+                {% if a %}
+                  <span class="proficiency-stars" aria-label="Level {{ a.current_level }} of 5">
+                    {% for i in range(1, 6) %}<span class="{% if i <= a.current_level %}filled{% endif %}">★</span>{% endfor %}
+                  </span>
+                  <small class="level-text">Level {{ a.current_level }}</small>
+                {% else %}
+                  <span class="status-pill status-not-started">Not Assessed</span>
+                {% endif %}
               </td>
-              <td>{{ a.assessed_on.strftime('%b %d, %Y') if a.assessed_on else '—' }}</td>
-              <td>Level {{ a.required_level }}</td>
-              <td>{% if a.gap > 0 %}<span class="gap-badge">{{ a.gap }}</span>{% else %}<span class="gap-badge gap-zero">0</span>{% endif %}</td>
+              <td>{{ a.assessed_on.strftime('%b %d, %Y') if a and a.assessed_on else '—' }}</td>
+              <td>{% if row.target %}<strong>Level {{ row.target }}</strong><small class="module-cell-sub">Project-derived</small>{% else %}<span class="muted">No active target</span>{% endif %}</td>
+              <td>{% if row.gap is none %}<span class="muted">—</span>{% elif row.gap > 0 %}<span class="gap-badge">{{ row.gap }}</span>{% else %}<span class="gap-badge gap-zero">0</span>{% endif %}</td>
+              <td>{% if row.projects %}<div class="stacked-cell"><strong>{{ row.projects|join(', ') }}</strong><small>{{ row.tasks|length }} active task{{ '' if row.tasks|length == 1 else 's' }}</small></div>{% else %}<span class="muted">Not currently required</span>{% endif %}</td>
             </tr>
           {% else %}
-            <tr><td colspan="5"><div class="empty-state">No competency assessments recorded yet.</div></td></tr>
+            <tr><td colspan="6"><div class="empty-state">No competency assessments or active project requirements recorded yet.</div></td></tr>
           {% endfor %}
           </tbody>
         </table>
@@ -57,14 +75,18 @@
     </article>
 
     <aside class="module-panel competency-summary-card">
-      <div class="module-panel-head"><div><h2>Competency Summary</h2><p>Readiness against recorded target levels</p></div></div>
+      <div class="module-panel-head"><div><h2>Competency Summary</h2><p>Readiness against active project targets</p></div></div>
+      {% if assessment_summary.coverage is not none %}
       <div class="summary-donut" style="--pct: {{ assessment_summary.coverage }}">
         <div><strong>{{ assessment_summary.coverage }}%</strong><span>Coverage</span></div>
       </div>
+      {% else %}
+      <div class="summary-no-target"><strong>—</strong><span>No active project targets</span></div>
+      {% endif %}
       <ul class="summary-legend">
         <li><span class="legend-dot green"></span><span>Meets target</span><strong>{{ assessment_summary.meets_target }}</strong></li>
         <li><span class="legend-dot amber"></span><span>Needs development</span><strong>{{ assessment_summary.gaps }}</strong></li>
-        <li><span class="legend-dot blue"></span><span>High proficiency</span><strong>{{ assessment_summary.high }}</strong></li>
+        <li><span class="legend-dot blue"></span><span>Required, not assessed</span><strong>{{ assessment_summary.unassessed_required }}</strong></li>
         <li><span class="legend-dot gray"></span><span>Total assessed</span><strong>{{ assessment_summary.total }}</strong></li>
       </ul>
     </aside>
