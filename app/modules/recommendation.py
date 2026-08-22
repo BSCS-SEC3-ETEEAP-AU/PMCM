@@ -107,15 +107,24 @@ def list_resources():
 @manager_required
 def add_resource():
     title = request.form.get("title", "").strip()
-    if title:
-        db.session.add(LearningResource(
-            title=title,
-            description=request.form.get("description", ""),
-            skill_id=int(request.form.get("skill_id")),
-            target_level=int(request.form.get("target_level", 3)),
-            resource_type=request.form.get("resource_type", "Course"),
-            url=request.form.get("url", ""),
-        ))
-        db.session.commit()
-        flash("Learning resource added to repository.", "success")
+    provider = request.form.get("provider", "").strip()
+    access_type = request.form.get("access_type", "").strip()
+    allowed_access_types = {"Internal", "Company Subscription", "External"}
+
+    if not title or not provider or access_type not in allowed_access_types:
+        flash("Title, provider/source, and a valid access type are required.", "warning")
+        return redirect(url_for("recommendation.list_resources"))
+
+    db.session.add(LearningResource(
+        title=title,
+        description=request.form.get("description", "").strip(),
+        skill_id=int(request.form.get("skill_id")),
+        target_level=int(request.form.get("target_level", 3)),
+        resource_type=request.form.get("resource_type", "Course"),
+        provider=provider,
+        access_type=access_type,
+        url=request.form.get("url", "").strip(),
+    ))
+    db.session.commit()
+    flash("Learning resource added to repository.", "success")
     return redirect(url_for("recommendation.list_resources"))

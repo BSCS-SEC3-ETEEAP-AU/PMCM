@@ -1,18 +1,39 @@
 {% extends "base.html" %}
+{% block page_title %}Learning Resource Repository{% endblock %}
+{% block page_subtitle %}Curated internal and external learning resources used by the rule-based recommendation engine{% endblock %}
 {% block content %}
-<h2>Learning Resource Repository</h2>
-<table class="data-table">
-  <thead><tr><th>Title</th><th>Type</th><th>Skill</th><th>Builds to Lvl</th><th>Description</th></tr></thead>
+<div class="module-info-banner learning-repository-note"><span>i</span><p>Each resource identifies its provider and access type. The platform recommends and links to learning resources; it does not host the course content itself.</p></div>
+
+<div class="table-wrap learning-resource-table-wrap">
+<table class="data-table learning-resource-table">
+  <thead><tr><th>Title</th><th>Provider / Source</th><th>Access</th><th>Type</th><th>Skill</th><th>Builds to Lvl</th><th>Description</th><th>Resource</th></tr></thead>
   <tbody>
   {% for r in resources %}
-    <tr><td>{{ r.title }}</td><td>{{ r.resource_type }}</td><td>{{ r.skill.name }}</td>
-        <td>{{ r.target_level }}</td><td>{{ r.description }}</td></tr>
+    <tr>
+      <td><strong>{{ r.title }}</strong></td>
+      <td>{{ r.provider or 'Not specified' }}</td>
+      <td><span class="resource-access access-{{ (r.access_type or 'unspecified')|lower|replace(' ','-') }}">{{ r.access_type or 'Not specified' }}</span></td>
+      <td>{{ r.resource_type }}</td>
+      <td>{{ r.skill.name }}</td>
+      <td>{{ r.target_level }}</td>
+      <td>{{ r.description or '—' }}</td>
+      <td>{% if r.url %}<a class="btn secondary small" href="{{ r.url }}" target="_blank" rel="noopener">Open Resource</a>{% else %}<span class="resource-link-missing">No link</span>{% endif %}</td>
+    </tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
 <form class="form-card" method="POST" action="{{ url_for('recommendation.add_resource') }}">
   <h3>Add Learning Resource</h3>
   <label>Title <input type="text" name="title" required></label>
+  <label>Provider / Source <input type="text" name="provider" placeholder="e.g. LinkedIn Learning or Internal Learning Portal" required></label>
+  <label>Access Type
+    <select name="access_type" required>
+      <option value="Internal">Internal</option>
+      <option value="Company Subscription">Company Subscription</option>
+      <option value="External">External</option>
+    </select>
+  </label>
   <label>Type
     <select name="resource_type"><option>Course</option><option>Article</option><option>Certification</option></select>
   </label>
@@ -21,7 +42,7 @@
   </label>
   <label>Builds to Level <input type="number" name="target_level" min="1" max="5" value="3"></label>
   <label>Description <input type="text" name="description"></label>
-  <label>URL <input type="text" name="url"></label>
-  <button class="btn primary" type="submit">Add</button>
+  <label>URL <input type="url" name="url" placeholder="https://..."></label>
+  <button class="btn primary" type="submit">Add Resource</button>
 </form>
 {% endblock %}

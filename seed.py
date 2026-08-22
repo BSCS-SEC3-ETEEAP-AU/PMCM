@@ -157,18 +157,19 @@ with app.app_context():
 
     # ---- Learning resources (repository) ----
     resources = [
-        ("Advanced Python for Data", "Deep dive into Python data tooling.", "Python", 5, "Course", ""),
-        ("React Patterns & Hooks", "Modern React development.", "React", 4, "Course", ""),
-        ("AWS Data Engineering Path", "Build pipelines on AWS.", "Cloud (AWS)", 4, "Course", ""),
-        ("Data Pipeline Orchestration", "Airflow & orchestration basics.", "Data Pipelines", 4, "Article", ""),
-        ("Tableau Dashboards", "Build executive dashboards.", "Data Visualization", 4, "Course", ""),
-        ("Effective Stakeholder Communication", "Communication skills for IT.", "Communication", 4, "Article", ""),
-        ("Professional Scrum Master", "Agile/Scrum certification prep.", "Agile/Scrum", 4, "Certification", ""),
+        ("Advanced Python for Data", "Deep dive into Python data tooling.", "Python", 5, "Course", "Internal Learning Catalog", "Internal", ""),
+        ("React Patterns & Hooks", "Modern React development.", "React", 4, "Course", "Internal Learning Catalog", "Internal", ""),
+        ("AWS Data Engineering Path", "Build pipelines on AWS.", "Cloud (AWS)", 4, "Course", "Internal Learning Catalog", "Internal", ""),
+        ("Data Pipeline Orchestration", "Airflow & orchestration basics.", "Data Pipelines", 4, "Article", "Internal Knowledge Base", "Internal", ""),
+        ("Tableau Dashboards", "Build executive dashboards.", "Data Visualization", 4, "Course", "Internal Learning Catalog", "Internal", ""),
+        ("Effective Stakeholder Communication", "Communication skills for IT.", "Communication", 4, "Article", "Internal Learning Catalog", "Internal", ""),
+        ("Professional Scrum Master", "Agile/Scrum certification prep.", "Agile/Scrum", 4, "Certification", "Internal Learning Catalog", "Internal", ""),
     ]
-    for title, desc, sk, lvl, rtype, url in resources:
+    for title, desc, sk, lvl, rtype, provider, access_type, url in resources:
         db.session.add(LearningResource(
             title=title, description=desc, skill_id=skills[sk].id,
-            target_level=lvl, resource_type=rtype, url=url,
+            target_level=lvl, resource_type=rtype, provider=provider,
+            access_type=access_type, url=url,
         ))
     db.session.commit()
 

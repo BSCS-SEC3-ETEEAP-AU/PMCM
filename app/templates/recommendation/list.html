@@ -30,6 +30,8 @@
         <span class="skill-tag">{{ r.skill.name }}</span>
         <span>{{ r.resource.resource_type }}</span>
         <span>Target Level {{ r.resource.target_level }}</span>
+        <span>Provider: {{ r.resource.provider or 'Not specified' }}</span>
+        <span>Access: {{ r.resource.access_type or 'Not specified' }}</span>
       </div>
     </div>
     <div class="learning-meta">

@@ -175,6 +175,8 @@ class LearningResource(db.Model):
     skill_id = db.Column(db.Integer, db.ForeignKey("skills.id"), nullable=False)
     target_level = db.Column(db.Integer, default=3)  # builds toward this proficiency
     resource_type = db.Column(db.String(40), default="Course")  # Course | Article | Certification
+    provider = db.Column(db.String(120))  # e.g., Internal Learning Portal | LinkedIn Learning | AWS Skill Builder
+    access_type = db.Column(db.String(30))  # Internal | Company Subscription | External
     url = db.Column(db.String(300))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
