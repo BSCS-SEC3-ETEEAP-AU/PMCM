@@ -1,18 +1,63 @@
 {% extends "base.html" %}
+{% block page_title %}Reports{% endblock %}
+{% block page_subtitle %}Project, workforce and competency insights for managerial decision-making{% endblock %}
 {% block content %}
-<h2>Reports &amp; Dashboard</h2>
-<div class="card-grid">
-  <a class="proj-card" href="{{ url_for('reports.project_status') }}">
-    <div class="proj-title">📁 Project Status Report</div>
-    <div class="proj-desc">Progress, task counts, and status breakdown per project.</div>
+<section class="module-kpi-row reports-kpi-row" aria-label="Report summary">
+  <a class="module-kpi-card mk-green" href="{{ url_for('reports.project_status') }}">
+    <span class="module-kpi-icon">↗</span><div><span class="module-kpi-label">Project Status</span><strong>{{ report_summary.total_projects }}</strong><small>Total projects</small></div>
   </a>
-  <a class="proj-card" href="{{ url_for('reports.competency_report') }}">
-    <div class="proj-title">🧠 Competency Report</div>
-    <div class="proj-desc">Coverage and skill gaps by employee and team.</div>
+  <a class="module-kpi-card mk-blue" href="{{ url_for('reports.competency_report') }}">
+    <span class="module-kpi-icon">▥</span><div><span class="module-kpi-label">Team Coverage</span><strong>{{ report_summary.team_members }}</strong><small>Team members</small></div>
   </a>
-  <a class="proj-card" href="{{ url_for('main.dashboard') }}">
-    <div class="proj-title">📊 Executive Dashboard</div>
-    <div class="proj-desc">KPIs, task distribution, and team coverage.</div>
+  <a class="module-kpi-card mk-amber" href="{{ url_for('competency.gap_report') }}">
+    <span class="module-kpi-icon">◎</span><div><span class="module-kpi-label">Competency Gaps</span><strong>{{ report_summary.gap_count }}</strong><small>Open gaps</small></div>
   </a>
-</div>
+  <a class="module-kpi-card mk-violet" href="{{ url_for('recommendation.my_recommendations') }}">
+    <span class="module-kpi-icon">◇</span><div><span class="module-kpi-label">Learning Completion</span><strong>{{ report_summary.learning_completion }}%</strong><small>Completion rate</small></div>
+  </a>
+</section>
+
+<section class="reports-overview-grid">
+  <article class="module-panel report-chart-card">
+    <div class="module-panel-head"><div><h2>Project Status Overview</h2><p>Distribution of projects by current status</p></div><a href="{{ url_for('reports.project_status') }}">View report →</a></div>
+    <div class="report-donut-layout">
+      <div class="report-donut" style="--active: {{ project_status.active_pct }}; --completed: {{ project_status.completed_pct }}">
+        <div><strong>{{ report_summary.total_projects }}</strong><span>Total Projects</span></div>
+      </div>
+      <ul class="summary-legend report-legend">
+        <li><span class="legend-dot blue"></span><span>Active</span><strong>{{ project_status.active }}</strong></li>
+        <li><span class="legend-dot green"></span><span>Completed</span><strong>{{ project_status.completed }}</strong></li>
+        <li><span class="legend-dot amber"></span><span>On Hold</span><strong>{{ project_status.on_hold }}</strong></li>
+      </ul>
+    </div>
+  </article>
+
+  <article class="module-panel report-chart-card">
+    <div class="module-panel-head"><div><h2>Competency Coverage by Team</h2><p>Share of assessed competencies meeting target proficiency</p></div><a href="{{ url_for('reports.competency_report') }}">View report →</a></div>
+    <div class="coverage-bars">
+      {% for row in team_coverage %}
+      <div class="coverage-row">
+        <div class="coverage-label"><span>{{ row.team }}</span><strong>{{ row.coverage }}%</strong></div>
+        <div class="coverage-track"><span style="width: {{ row.coverage }}%"></span></div>
+        <small>{{ row.assessed }} assessed · {{ row.gaps }} gap{{ '' if row.gaps == 1 else 's' }}</small>
+      </div>
+      {% else %}<div class="empty-state">No competency assessment data available.</div>{% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="module-panel recent-report-panel">
+  <div class="module-panel-head"><div><h2>Recent Reports</h2><p>Latest report activity recorded by the system</p></div></div>
+  <div class="recent-report-grid">
+    {% for log in recent_reports %}
+    <div class="recent-report-item">
+      <span class="recent-report-dot"></span>
+      <div><strong>{{ log.report_type }}</strong><small>{{ log.filters or 'No filters' }}</small></div>
+      <time>{{ log.generated_at.strftime('%b %d, %Y') if log.generated_at else '—' }}</time>
+    </div>
+    {% else %}
+    <div class="empty-state">No report activity has been recorded yet. Open a report to begin the audit trail.</div>
+    {% endfor %}
+  </div>
+</section>
 {% endblock %}

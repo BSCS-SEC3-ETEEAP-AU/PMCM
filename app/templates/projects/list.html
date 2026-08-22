@@ -1,23 +1,112 @@
 {% extends "base.html" %}
+{% block page_title %}Projects{% endblock %}
+{% block page_subtitle %}Manage and monitor project delivery, ownership, progress and deadlines{% endblock %}
 {% block content %}
-<div class="row-between">
-  <h2>Projects</h2>
+<section class="module-toolbar">
+  <div class="module-search-wrap">
+    <span class="module-search-icon">⌕</span>
+    <input id="projectSearch" class="module-search" type="search" placeholder="Search projects..." aria-label="Search projects">
+  </div>
   {% if current_user.role in ('admin','manager') %}
-  <a class="btn primary" href="{{ url_for('projects.create_project') }}">+ New Project</a>
+  <a class="btn" href="{{ url_for('projects.create_project') }}">+ New Project</a>
   {% endif %}
-</div>
-<div class="card-grid">
-  {% for p in projects %}
-  <a class="proj-card" href="{{ url_for('projects.detail', project_id=p.id) }}">
-    <div class="proj-title">{{ p.name }}</div>
-    <div class="proj-meta">
-      <span class="status-pill status-{{ p.status|lower|replace(' ','') }}">{{ p.status }}</span>
-      <span>👤 {{ p.manager.full_name }}</span>
+</section>
+
+<section class="module-kpi-row module-kpi-five" aria-label="Project summary">
+  <article class="module-kpi-card mk-green">
+    <span class="module-kpi-icon">▣</span>
+    <div><span class="module-kpi-label">Total Projects</span><strong>{{ project_summary.total }}</strong></div>
+  </article>
+  <article class="module-kpi-card mk-blue">
+    <span class="module-kpi-icon">▤</span>
+    <div><span class="module-kpi-label">Active</span><strong>{{ project_summary.active }}</strong></div>
+  </article>
+  <article class="module-kpi-card mk-violet">
+    <span class="module-kpi-icon">✓</span>
+    <div><span class="module-kpi-label">Completed</span><strong>{{ project_summary.completed }}</strong></div>
+  </article>
+  <article class="module-kpi-card mk-amber">
+    <span class="module-kpi-icon">Ⅱ</span>
+    <div><span class="module-kpi-label">On Hold</span><strong>{{ project_summary.on_hold }}</strong></div>
+  </article>
+  <article class="module-kpi-card mk-teal">
+    <span class="module-kpi-icon">◔</span>
+    <div><span class="module-kpi-label">Avg. Progress</span><strong>{{ project_summary.avg_progress }}%</strong></div>
+  </article>
+</section>
+
+<section class="module-panel module-table-panel">
+  <div class="module-panel-head">
+    <div>
+      <h2>Project Portfolio</h2>
+      <p>Current project status and task-based completion progress</p>
     </div>
-    <div class="proj-desc">{{ p.description[:90] }}{% if p.description|length > 90 %}…{% endif %}</div>
-  </a>
-  {% else %}
-  <p class="muted">No projects assigned to you yet.</p>
-  {% endfor %}
-</div>
+    <span id="projectCount" class="module-count">{{ project_rows|length }} project{{ '' if project_rows|length == 1 else 's' }}</span>
+  </div>
+
+  <div class="table-wrap">
+    <table class="module-table project-list-table" id="projectTable">
+      <thead>
+        <tr>
+          <th>Project Name</th>
+          <th>Manager</th>
+          <th>Status</th>
+          <th>Progress</th>
+          <th>Deadline</th>
+          <th>Team</th>
+          <th>Tasks</th>
+          <th aria-label="Actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in project_rows %}
+        <tr data-project-row data-search="{{ (row.project.name ~ ' ' ~ row.project.manager.full_name ~ ' ' ~ row.project.status)|lower }}">
+          <td>
+            <a class="module-primary-link" href="{{ url_for('projects.detail', project_id=row.project.id) }}">{{ row.project.name }}</a>
+            {% if row.project.description %}<small class="module-cell-sub">{{ row.project.description[:68] }}{% if row.project.description|length > 68 %}…{% endif %}</small>{% endif %}
+          </td>
+          <td>{{ row.project.manager.full_name }}</td>
+          <td><span class="status-pill status-{{ row.project.status|lower|replace(' ','-') }}">{{ row.project.status }}</span></td>
+          <td>
+            <div class="module-progress-cell">
+              <span class="module-progress-track"><span style="width: {{ row.progress }}%"></span></span>
+              <span>{{ row.progress }}%</span>
+            </div>
+          </td>
+          <td>{{ row.project.target_date.strftime('%b %d, %Y') if row.project.target_date else '—' }}</td>
+          <td>{{ row.team_size }}</td>
+          <td>{{ row.total_tasks }}</td>
+          <td class="module-action-cell"><a class="module-icon-link" href="{{ url_for('projects.detail', project_id=row.project.id) }}" title="View project" aria-label="View {{ row.project.name }}">→</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8"><div class="empty-state">No projects assigned to you yet.</div></td></tr>
+      {% endfor %}
+        <tr id="projectNoResults" hidden><td colspan="8"><div class="empty-state">No projects match your search.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const input = document.getElementById('projectSearch');
+  const rows = [...document.querySelectorAll('[data-project-row]')];
+  const count = document.getElementById('projectCount');
+  const empty = document.getElementById('projectNoResults');
+  if (!input) return;
+  input.addEventListener('input', () => {
+    const term = input.value.trim().toLowerCase();
+    let visible = 0;
+    rows.forEach(row => {
+      const show = !term || row.dataset.search.includes(term);
+      row.hidden = !show;
+      if (show) visible += 1;
+    });
+    if (count) count.textContent = `${visible} project${visible === 1 ? '' : 's'}`;
+    if (empty) empty.hidden = visible !== 0;
+  });
+})();
+</script>
 {% endblock %}

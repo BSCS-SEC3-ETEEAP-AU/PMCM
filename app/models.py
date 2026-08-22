@@ -213,5 +213,22 @@ class ReportLog(db.Model):
     user = db.relationship("User", backref="report_logs")
 
 
+class AccountAssistanceRequest(db.Model):
+    """Login-page request routed to Administrators for account assistance."""
+    __tablename__ = "account_assistance_requests"
+
+    id = db.Column(db.Integer, primary_key=True)
+    request_type = db.Column(db.String(40), nullable=False)
+    requester_name = db.Column(db.String(120), nullable=False)
+    requester_contact = db.Column(db.String(120), nullable=False)
+    message = db.Column(db.Text)
+    status = db.Column(db.String(20), nullable=False, default="Open")  # Open | Resolved
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    resolved_at = db.Column(db.DateTime)
+    resolved_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+
+    resolved_by = db.relationship("User", foreign_keys=[resolved_by_user_id])
+
+
 def init_db():
     db.create_all()

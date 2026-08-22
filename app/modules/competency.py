@@ -9,7 +9,7 @@ from flask_login import login_required, current_user
 from ..models import (
     db, Employee, Skill, Certification, CompetencyAssessment, User,
 )
-from ..decorators import manager_required
+from ..decorators import manager_required, admin_required
 
 competency_bp = Blueprint("competency", __name__, url_prefix="/competency")
 
@@ -41,6 +41,70 @@ def my_profile():
     return redirect(url_for("competency.employee_profile", employee_id=emp.id))
 
 
+@competency_bp.route("/overview")
+@manager_required
+def overview():
+    """Manager-facing competency overview for workforce development monitoring."""
+    employees = Employee.query.order_by(Employee.full_name).all()
+    assessments = CompetencyAssessment.query.all()
+    certifications = Certification.query.all()
+
+    assessments_by_employee = {}
+    for assessment in assessments:
+        assessments_by_employee.setdefault(assessment.employee_id, []).append(assessment)
+
+    certifications_by_employee = {}
+    for certification in certifications:
+        certifications_by_employee[certification.employee_id] = (
+            certifications_by_employee.get(certification.employee_id, 0) + 1
+        )
+
+    rows = []
+    assessed_employees = 0
+    employees_with_gaps = 0
+    total_gaps = 0
+
+    for employee in employees:
+        employee_assessments = assessments_by_employee.get(employee.id, [])
+        assessed_count = len(employee_assessments)
+        gap_count = sum(1 for assessment in employee_assessments if assessment.gap > 0)
+        meets_target = assessed_count - gap_count
+        coverage = round((meets_target / assessed_count) * 100) if assessed_count else None
+
+        if assessed_count:
+            assessed_employees += 1
+        if gap_count:
+            employees_with_gaps += 1
+        total_gaps += gap_count
+
+        rows.append({
+            "employee": employee,
+            "competencies": assessed_count,
+            "gaps": gap_count,
+            "coverage": coverage,
+            "certifications": certifications_by_employee.get(employee.id, 0),
+            "status": (
+                "Not Assessed" if assessed_count == 0
+                else "Meets Target" if gap_count == 0
+                else "Has Gaps"
+            ),
+        })
+
+    summary = {
+        "team_members": len(employees),
+        "assessed_employees": assessed_employees,
+        "employees_with_gaps": employees_with_gaps,
+        "total_gaps": total_gaps,
+        "certifications": len(certifications),
+    }
+
+    return render_template(
+        "competency/overview.html",
+        rows=rows,
+        summary=summary,
+    )
+
+
 @competency_bp.route("/employees")
 @login_required
 def list_employees():
@@ -62,9 +126,20 @@ def employee_profile(employee_id):
     certs = Certification.query.filter_by(employee_id=employee_id).order_by(Certification.issued_date.desc()).all()
     assessments = CompetencyAssessment.query.filter_by(employee_id=employee_id).all()
     skills = Skill.query.order_by(Skill.name).all()
+    total = len(assessments)
+    gaps = sum(1 for assessment in assessments if assessment.gap > 0)
+    meets_target = total - gaps
+    assessment_summary = {
+        "total": total,
+        "gaps": gaps,
+        "meets_target": meets_target,
+        "high": sum(1 for assessment in assessments if assessment.current_level >= 4),
+        "coverage": round(100 * meets_target / total) if total else 0,
+    }
     return render_template(
         "competency/profile.html",
         emp=emp, certs=certs, assessments=assessments, skills=skills,
+        assessment_summary=assessment_summary,
     )
 
 
@@ -127,7 +202,7 @@ def list_skills():
 
 
 @competency_bp.route("/skills/add", methods=["POST"])
-@manager_required
+@admin_required
 def add_skill():
     name = request.form.get("name", "").strip()
     if name:

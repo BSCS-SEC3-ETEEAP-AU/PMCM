@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Account Requests · SPM&ECD{% endblock %}
+{% block page_title %}Account Assistance Requests{% endblock %}
+{% block page_subtitle %}Review login, password, and account access requests submitted from the sign-in page{% endblock %}
+{% block content %}
+<div class="module-toolbar account-toolbar">
+  <div class="module-toolbar-copy">
+    <strong>{{ open_requests|length }} open request{{ '' if open_requests|length == 1 else 's' }}</strong>
+    <span>Resolve each request after the appropriate account action has been completed.</span>
+  </div>
+  <div class="module-toolbar-actions">
+    <a class="btn secondary" href="{{ url_for('auth.accounts') }}">User Accounts</a>
+  </div>
+</div>
+
+<div class="account-request-list">
+  {% for item in open_requests %}
+  <article class="module-panel account-request-card" id="request-{{ item.id }}">
+    <div class="account-request-main">
+      <div class="account-request-title">
+        <span class="account-request-type">{{ item.request_type }}</span>
+        <strong>{{ item.requester_name }}</strong>
+      </div>
+      <div class="account-request-meta">
+        <span><b>Username / Email:</b> {{ item.requester_contact }}</span>
+        <span><b>Submitted:</b> {{ item.created_at.strftime('%b %d, %Y %I:%M %p') }}</span>
+      </div>
+      {% if item.message %}<p>{{ item.message }}</p>{% endif %}
+    </div>
+    <form method="POST" action="{{ url_for('auth.resolve_account_request', request_id=item.id) }}">
+      <button class="btn primary" type="submit">Mark Resolved</button>
+    </form>
+  </article>
+  {% else %}
+  <div class="module-panel account-request-empty">
+    <strong>No open account assistance requests</strong>
+    <span>New requests submitted from the login page will appear here and in the Administrator notification bell.</span>
+  </div>
+  {% endfor %}
+</div>
+
+{% if resolved_requests %}
+<div class="module-panel account-request-history">
+  <div class="module-panel-head">
+    <div>
+      <h2>Recently Resolved</h2>
+      <p>Most recent completed account assistance requests</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Requester</th><th>Reason</th><th>Username / Email</th><th>Resolved</th><th>Resolved By</th></tr></thead>
+      <tbody>
+        {% for item in resolved_requests %}
+        <tr>
+          <td>{{ item.requester_name }}</td>
+          <td>{{ item.request_type }}</td>
+          <td>{{ item.requester_contact }}</td>
+          <td>{{ item.resolved_at.strftime('%b %d, %Y %I:%M %p') if item.resolved_at else '—' }}</td>
+          <td>{{ item.resolved_by.full_name if item.resolved_by else 'Administrator' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,21 +1,108 @@
 {% extends "base.html" %}
+{% block title %}Team Members · SPM&amp;ECD{% endblock %}
+{% block page_title %}Team Members{% endblock %}
+{% block page_subtitle %}View workforce profiles, team assignments and work arrangements{% endblock %}
+
 {% block content %}
-<h2>Employee Competency Profiles</h2>
-<table class="data-table">
-  <thead><tr><th>Name</th><th>Position</th><th>Team</th><th>Work Mode</th><th></th></tr></thead>
-  <tbody>
-  {% for e in employees %}
-    <tr>
-      <td>{{ e.full_name }}</td><td>{{ e.position }}</td><td>{{ e.team }}</td><td>{{ e.work_mode }}</td>
-      <td><a class="btn small" href="{{ url_for('competency.employee_profile', employee_id=e.id) }}">View</a></td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% if current_user.role in ('admin','manager') %}
-<div class="row-between" style="margin-top:24px">
-  <h3>Skills Catalog</h3>
-  <a class="btn primary" href="{{ url_for('competency.list_skills') }}">Manage Skills</a>
+{% set active_count = namespace(value=0) %}
+{% set teams = [] %}
+{% for e in employees %}
+  {% if e.user and e.user.is_active %}{% set active_count.value = active_count.value + 1 %}{% endif %}
+  {% if e.team and e.team not in teams %}{% set _ = teams.append(e.team) %}{% endif %}
+{% endfor %}
+
+<div class="module-toolbar team-toolbar">
+  <label class="module-search-wrap" aria-label="Search team members">
+    <span>⌕</span>
+    <input id="teamMemberSearch" type="search" placeholder="Search members, positions or teams..." autocomplete="off">
+  </label>
+  <a class="btn secondary" href="{{ url_for('competency.overview') }}">Team Competencies</a>
 </div>
-{% endif %}
+
+<section class="module-panel module-table-panel team-member-panel">
+  <div class="module-panel-head">
+    <div>
+      <h2>Team Directory</h2>
+      <p>Employee profiles available for project and competency monitoring</p>
+    </div>
+    <span class="module-count">{{ employees|length }} members</span>
+  </div>
+  <div class="table-scroll">
+    <table class="module-table team-member-table" id="teamMemberTable">
+      <thead>
+        <tr>
+          <th>Member</th>
+          <th>Position</th>
+          <th>Team</th>
+          <th>Work Mode</th>
+          <th>Status</th>
+          <th class="module-action-cell">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for e in employees %}
+        <tr data-search="{{ (e.full_name ~ ' ' ~ (e.position or '') ~ ' ' ~ (e.team or '') ~ ' ' ~ (e.work_mode or ''))|lower }}">
+          <td>
+            <div class="employee-cell">
+              <span class="employee-avatar-sm">{{ e.full_name[:1] }}</span>
+              <div>
+                <strong>{{ e.full_name }}</strong>
+                <small>{{ e.user.email if e.user and e.user.email else 'Employee profile' }}</small>
+              </div>
+            </div>
+          </td>
+          <td>{{ e.position or '—' }}</td>
+          <td>{{ e.team or '—' }}</td>
+          <td><span class="workmode-badge workmode-{{ (e.work_mode or 'hybrid')|lower }}">{{ (e.work_mode or 'hybrid')|title }}</span></td>
+          <td>
+            {% if e.user %}
+              {% if e.user.is_active %}<span class="account-status active"><i></i>Active</span>{% else %}<span class="account-status disabled"><i></i>Disabled</span>{% endif %}
+            {% else %}
+              <span class="account-status profile-only"><i></i>Profile Only</span>
+            {% endif %}
+          </td>
+          <td class="module-action-cell"><a class="btn primary small" href="{{ url_for('competency.employee_profile', employee_id=e.id) }}">View Competencies</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div id="teamNoResults" class="empty-state competency-no-results" hidden>No team members match your search.</div>
+</section>
+
+<div class="team-summary-row">
+  <article class="module-kpi-card team-summary-card mk-green">
+    <span class="module-kpi-icon">♙</span>
+    <div><span class="module-kpi-label">Total Members</span><strong>{{ employees|length }}</strong><small>Employee profiles</small></div>
+  </article>
+  <article class="module-kpi-card team-summary-card mk-blue">
+    <span class="module-kpi-icon">✓</span>
+    <div><span class="module-kpi-label">Active Accounts</span><strong>{{ active_count.value }}</strong><small>Linked system users</small></div>
+  </article>
+  <article class="module-kpi-card team-summary-card mk-amber">
+    <span class="module-kpi-icon">◇</span>
+    <div><span class="module-kpi-label">Teams</span><strong>{{ teams|length }}</strong><small>Workforce groups</small></div>
+  </article>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const input = document.getElementById('teamMemberSearch');
+  const rows = Array.from(document.querySelectorAll('#teamMemberTable tbody tr'));
+  const empty = document.getElementById('teamNoResults');
+  if (!input) return;
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    let visible = 0;
+    rows.forEach(row => {
+      const show = !q || row.dataset.search.includes(q);
+      row.hidden = !show;
+      if (show) visible += 1;
+    });
+    empty.hidden = visible !== 0;
+  });
+})();
+</script>
 {% endblock %}

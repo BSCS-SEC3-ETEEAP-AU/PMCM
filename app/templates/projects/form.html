@@ -1,30 +1,52 @@
 {% extends "base.html" %}
+{% set editing = project is not none %}
+{% block title %}{{ 'Edit Project' if editing else 'Create Project' }} · SPM&amp;ECD{% endblock %}
+{% block page_title %}{{ 'Edit Project' if editing else 'Create Project' }}{% endblock %}
+{% block page_subtitle %}{{ 'Update project details, delivery dates, status and team membership' if editing else 'Set up project details, delivery dates and team membership' }}{% endblock %}
 {% block content %}
-<h2>Create Project</h2>
-<form class="form-card" method="POST" action="{{ url_for('projects.create_project') }}">
+<form class="form-card project-form-card" method="POST" action="{{ url_for('projects.edit_project', project_id=project.id) if editing else url_for('projects.create_project') }}">
   <label>Project Name
-    <input type="text" name="name" required>
+    <input type="text" name="name" value="{{ project.name if editing else request.form.get('name','') }}" required>
   </label>
   <label>Description
-    <textarea name="description" rows="3"></textarea>
+    <textarea name="description" rows="3">{{ project.description if editing else request.form.get('description','') }}</textarea>
   </label>
   <label>Status
+    {% set current_status = project.status if editing else request.form.get('status','Active') %}
     <select name="status">
-      <option>Active</option><option>On Hold</option><option>Completed</option>
+      {% for status in project_statuses %}
+      <option value="{{ status }}" {% if current_status == status %}selected{% endif %}>{{ status }}</option>
+      {% endfor %}
     </select>
   </label>
   <div class="row-2">
-    <label>Start Date <input type="date" name="start_date"></label>
-    <label>Target Date <input type="date" name="target_date"></label>
+    <label>Start Date
+      <input type="date" name="start_date" value="{{ project.start_date.isoformat() if editing and project.start_date else request.form.get('start_date','') }}">
+    </label>
+    <label>Target / Deadline
+      <input type="date" name="target_date" value="{{ project.target_date.isoformat() if editing and project.target_date else request.form.get('target_date','') }}">
+    </label>
   </div>
   <fieldset>
     <legend>Team Members</legend>
+    <p class="muted form-help">Only project members can be selected as task assignees.</p>
     <div class="check-grid">
       {% for e in employees %}
-      <label class="chk"><input type="checkbox" name="members" value="{{ e.id }}"> {{ e.full_name }} <small>({{ e.team }})</small></label>
+      <label class="chk">
+        <input type="checkbox" name="members" value="{{ e.id }}" {% if e.id in selected_member_ids %}checked{% endif %}>
+        {{ e.full_name }} <small>({{ e.team }})</small>
+      </label>
       {% endfor %}
     </div>
   </fieldset>
-  <button class="btn primary" type="submit">Create Project</button>
+  <div class="form-actions">
+    {% if editing %}
+    <a class="btn secondary" href="{{ url_for('projects.detail', project_id=project.id) }}">Cancel</a>
+    <button class="btn primary" type="submit">Save Changes</button>
+    {% else %}
+    <a class="btn secondary" href="{{ url_for('projects.list_projects') }}">Cancel</a>
+    <button class="btn primary" type="submit">Create Project</button>
+    {% endif %}
+  </div>
 </form>
 {% endblock %}

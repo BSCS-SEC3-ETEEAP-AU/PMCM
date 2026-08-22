@@ -20,7 +20,51 @@ reports_bp = Blueprint("reports", __name__, url_prefix="/reports")
 def index():
     projects = Project.query.order_by(Project.name).all()
     employees = Employee.query.order_by(Employee.full_name).all()
-    return render_template("reports/index.html", projects=projects, employees=employees)
+    assessments = CompetencyAssessment.query.all()
+    recommendations = LearningRecommendation.query.all()
+
+    total_projects = len(projects)
+    active = sum(1 for project in projects if project.status == "Active")
+    completed = sum(1 for project in projects if project.status == "Completed")
+    on_hold = sum(1 for project in projects if project.status == "On Hold")
+    completed_learning = sum(1 for rec in recommendations if rec.status == "Completed")
+
+    report_summary = {
+        "total_projects": total_projects,
+        "team_members": len(employees),
+        "gap_count": sum(1 for assessment in assessments if assessment.gap > 0),
+        "learning_completion": round(100 * completed_learning / len(recommendations)) if recommendations else 0,
+    }
+    project_status = {
+        "active": active,
+        "completed": completed,
+        "on_hold": on_hold,
+        "active_pct": round(100 * active / total_projects) if total_projects else 0,
+        "completed_pct": round(100 * completed / total_projects) if total_projects else 0,
+    }
+
+    team_coverage = []
+    for team in sorted({employee.team for employee in employees if employee.team}):
+        team_employees = [employee for employee in employees if employee.team == team]
+        team_employee_ids = {employee.id for employee in team_employees}
+        team_assessments = [assessment for assessment in assessments if assessment.employee_id in team_employee_ids]
+        gaps = sum(1 for assessment in team_assessments if assessment.gap > 0)
+        assessed = len(team_assessments)
+        coverage = round(100 * (assessed - gaps) / assessed) if assessed else 0
+        team_coverage.append({
+            "team": team,
+            "assessed": assessed,
+            "gaps": gaps,
+            "coverage": coverage,
+        })
+
+    recent_reports = ReportLog.query.order_by(ReportLog.generated_at.desc()).limit(6).all()
+    return render_template(
+        "reports/index.html",
+        projects=projects, employees=employees,
+        report_summary=report_summary, project_status=project_status,
+        team_coverage=team_coverage, recent_reports=recent_reports,
+    )
 
 
 @reports_bp.route("/project-status")

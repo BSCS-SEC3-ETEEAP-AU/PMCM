@@ -1,42 +1,111 @@
 {% extends "base.html" %}
+{% block page_title %}Competency Profile{% endblock %}
+{% block page_subtitle %}View employee proficiency, competency gaps and professional certifications{% endblock %}
 {% block content %}
-<div class="row-between">
-  <h2>{{ emp.full_name }}</h2>
-  <span class="muted">{{ emp.position }} · {{ emp.team }} · {{ emp.work_mode }}</span>
+<section class="profile-hero module-panel">
+  <div class="profile-identity">
+    <div class="profile-avatar">{{ emp.full_name[:1] }}</div>
+    <div>
+      <h2>{{ emp.full_name }}</h2>
+      <p>{{ emp.position or 'Employee' }}</p>
+      {% if emp.user and emp.user.email %}<small>{{ emp.user.email }}</small>{% endif %}
+    </div>
+  </div>
+  <div class="profile-facts">
+    <div><span>Team</span><strong>{{ emp.team or '—' }}</strong></div>
+    <div><span>Work Mode</span><strong>{{ (emp.work_mode or '—')|title }}</strong></div>
+    <div><span>Competencies</span><strong>{{ assessment_summary.total }}</strong></div>
+    <div><span>Needs Development</span><strong>{{ assessment_summary.gaps }}</strong></div>
+  </div>
+</section>
+
+<div class="module-tabs" role="tablist" aria-label="Competency profile sections">
+  <button class="module-tab active" type="button" data-tab="competencies">Competencies</button>
+  <button class="module-tab" type="button" data-tab="certifications">Certifications</button>
 </div>
 
-<div class="dash-grid">
-  <div class="card">
-    <h3>Competency Assessment</h3>
-    <table class="data-table">
-      <thead><tr><th>Skill</th><th>Current</th><th>Required</th><th>Gap</th></tr></thead>
-      <tbody>
-      {% for a in assessments %}
-        <tr>
-          <td>{{ a.skill.name }}</td>
-          <td>{{ a.current_level }} ({{ a.skill.category }})</td>
-          <td>{{ a.required_level }}</td>
-          <td>{% if a.gap > 0 %}<span class="gap-badge">{{ a.gap }}</span>{% else %}—{% endif %}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    <a class="btn primary" href="{{ url_for('competency.assess', employee_id=emp.id) }}">Update Assessment</a>
-  </div>
+<section id="tab-competencies" class="profile-tab-panel">
+  <div class="profile-grid">
+    <article class="module-panel module-table-panel">
+      <div class="module-panel-head">
+        <div><h2>Competency Assessment</h2><p>Current proficiency compared with the recorded target level</p></div>
+        <a class="btn small" href="{{ url_for('competency.assess', employee_id=emp.id) }}">Update Assessment</a>
+      </div>
+      <div class="table-wrap">
+        <table class="module-table competency-table">
+          <thead><tr><th>Competency</th><th>Proficiency Level</th><th>Last Assessed</th><th>Target</th><th>Gap</th></tr></thead>
+          <tbody>
+          {% for a in assessments %}
+            <tr>
+              <td><strong>{{ a.skill.name }}</strong><small class="module-cell-sub">{{ a.skill.category or 'General' }}</small></td>
+              <td>
+                <span class="proficiency-stars" aria-label="Level {{ a.current_level }} of 5">
+                  {% for i in range(1, 6) %}<span class="{% if i <= a.current_level %}filled{% endif %}">★</span>{% endfor %}
+                </span>
+                <small class="level-text">Level {{ a.current_level }}</small>
+              </td>
+              <td>{{ a.assessed_on.strftime('%b %d, %Y') if a.assessed_on else '—' }}</td>
+              <td>Level {{ a.required_level }}</td>
+              <td>{% if a.gap > 0 %}<span class="gap-badge">{{ a.gap }}</span>{% else %}<span class="gap-badge gap-zero">0</span>{% endif %}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5"><div class="empty-state">No competency assessments recorded yet.</div></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
 
-  <div class="card">
-    <h3>Certifications</h3>
-    <ul class="cert-list">
+    <aside class="module-panel competency-summary-card">
+      <div class="module-panel-head"><div><h2>Competency Summary</h2><p>Readiness against recorded target levels</p></div></div>
+      <div class="summary-donut" style="--pct: {{ assessment_summary.coverage }}">
+        <div><strong>{{ assessment_summary.coverage }}%</strong><span>Coverage</span></div>
+      </div>
+      <ul class="summary-legend">
+        <li><span class="legend-dot green"></span><span>Meets target</span><strong>{{ assessment_summary.meets_target }}</strong></li>
+        <li><span class="legend-dot amber"></span><span>Needs development</span><strong>{{ assessment_summary.gaps }}</strong></li>
+        <li><span class="legend-dot blue"></span><span>High proficiency</span><strong>{{ assessment_summary.high }}</strong></li>
+        <li><span class="legend-dot gray"></span><span>Total assessed</span><strong>{{ assessment_summary.total }}</strong></li>
+      </ul>
+    </aside>
+  </div>
+</section>
+
+<section id="tab-certifications" class="profile-tab-panel" hidden>
+  <article class="module-panel">
+    <div class="module-panel-head"><div><h2>Certifications</h2><p>Professional credentials associated with this employee profile</p></div></div>
+    <div class="cert-card-list">
       {% for c in certs %}
-      <li><strong>{{ c.name }}</strong> <small>· {{ c.issuer }} · {{ c.issued_date }}</small></li>
-      {% else %}<li class="muted">No certifications recorded.</li>{% endfor %}
-    </ul>
-    <form class="inline-form" method="POST" action="{{ url_for('competency.add_cert', employee_id=emp.id) }}">
+      <div class="cert-card-row">
+        <div class="cert-icon">✓</div>
+        <div class="cert-card-main"><strong>{{ c.name }}</strong><span>{{ c.issuer or 'Issuer not specified' }}</span></div>
+        <div class="cert-date"><span>Issued</span><strong>{{ c.issued_date.strftime('%b %d, %Y') if c.issued_date else '—' }}</strong></div>
+        <div class="cert-date"><span>Expires</span><strong>{{ c.expiry_date.strftime('%b %d, %Y') if c.expiry_date else '—' }}</strong></div>
+      </div>
+      {% else %}<div class="empty-state">No certifications recorded.</div>{% endfor %}
+    </div>
+
+    <form class="cert-add-form" method="POST" action="{{ url_for('competency.add_cert', employee_id=emp.id) }}">
       <input type="text" name="name" placeholder="Certification name" required>
       <input type="text" name="issuer" placeholder="Issuer">
-      <input type="date" name="issued_date" title="Issued">
-      <button class="btn" type="submit">Add</button>
+      <label><span>Issued</span><input type="date" name="issued_date"></label>
+      <label><span>Expiry</span><input type="date" name="expiry_date"></label>
+      <button class="btn" type="submit">+ Add Certification</button>
     </form>
-  </div>
-</div>
+  </article>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const tabs = [...document.querySelectorAll('[data-tab]')];
+  tabs.forEach(tab => tab.addEventListener('click', () => {
+    tabs.forEach(t => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('.profile-tab-panel').forEach(panel => {
+      panel.hidden = panel.id !== `tab-${tab.dataset.tab}`;
+    });
+  }));
+})();
+</script>
 {% endblock %}

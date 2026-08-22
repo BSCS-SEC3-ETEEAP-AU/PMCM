@@ -30,18 +30,25 @@
           <span class="nav-ico">□</span>
           <span>Projects</span>
         </a>
-        <a href="{{ url_for('projects.list_projects') }}">
-          <span class="nav-ico">✓</span>
-          <span>Tasks</span>
-        </a>
-        {% if current_user.role in ('admin', 'manager') %}
-        <a class="{% if request.endpoint and request.endpoint.startswith('competency.') and 'skills' not in request.endpoint and 'gap' not in request.endpoint %}active{% endif %}"
+        {% if current_user.role == 'admin' %}
+        <a class="{% if request.endpoint and request.endpoint.startswith('competency.') and 'skills' not in request.endpoint and 'gap' not in request.endpoint and 'overview' not in request.endpoint %}active{% endif %}"
           href="{{ url_for('competency.list_employees') }}">
           <span class="nav-ico">◌</span>
           <span>Team</span>
         </a>
-        <a class="{% if request.endpoint and request.endpoint.startswith('competency.') and ('skills' in request.endpoint or 'gap' in request.endpoint) %}active{% endif %}"
+        <a class="{% if request.endpoint and request.endpoint.startswith('competency.') and ('skills' in request.endpoint or 'gap' in request.endpoint or 'overview' in request.endpoint) %}active{% endif %}"
           href="{{ url_for('competency.list_skills') }}">
+          <span class="nav-ico">◎</span>
+          <span>Competencies</span>
+        </a>
+        {% elif current_user.role == 'manager' %}
+        <a class="{% if request.endpoint == 'competency.list_employees' %}active{% endif %}"
+          href="{{ url_for('competency.list_employees') }}">
+          <span class="nav-ico">◌</span>
+          <span>Team</span>
+        </a>
+        <a class="{% if request.endpoint and request.endpoint.startswith('competency.') and request.endpoint != 'competency.list_employees' %}active{% endif %}"
+          href="{{ url_for('competency.overview') }}">
           <span class="nav-ico">◎</span>
           <span>Competencies</span>
         </a>
@@ -86,10 +93,66 @@
         <button class="menu-toggle" type="button" aria-label="Open navigation">☰</button>
 
         <div class="appbar-right">
-          <button class="icon-btn notif-btn" type="button" aria-label="Notifications">
-            <span class="notif-ico">🔔</span>
-            <span class="notif-badge">3</span>
-          </button>
+          <details class="notif-menu" data-user-id="{{ current_user.id }}" data-notification-signature="{{ shell_notification_signature }}">
+            <summary class="notif-btn" aria-label="Notifications" title="Notifications">
+              <svg class="notif-ico" viewBox="0 0 32 32" aria-hidden="true">
+                <defs>
+                  <linearGradient id="notif-bell-gradient-{{ current_user.id }}" x1="5" y1="5" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+                    <stop offset="0" stop-color="#11cbd1"></stop>
+                    <stop offset="1" stop-color="#3b82f6"></stop>
+                  </linearGradient>
+                </defs>
+                <path stroke="url(#notif-bell-gradient-{{ current_user.id }})" d="M16 4.8c-4.1 0-7.2 3.1-7.2 7.3v3.2c0 2.7-.9 5.1-2.8 7h20c-1.9-1.9-2.8-4.3-2.8-7v-3.2c0-4.2-3.1-7.3-7.2-7.3Z"></path>
+                <path stroke="url(#notif-bell-gradient-{{ current_user.id }})" d="M12.8 24.2c.5 1.8 1.6 2.8 3.2 2.8s2.8-1 3.2-2.8"></path>
+              </svg>
+              {% if shell_notification_count %}
+              <span class="notif-badge" aria-label="Unread notifications"></span>
+              {% endif %}
+            </summary>
+            <div class="notif-dropdown">
+              <div class="notif-dropdown-head">
+                <div>
+                  <strong>Notifications</strong>
+                  <small>{% if current_user.role == 'admin' %}Account requests and upcoming deadlines{% else %}Upcoming project deadlines{% endif %}</small>
+                </div>
+                {% if shell_notification_count %}<span>{{ shell_notification_count }}</span>{% endif %}
+              </div>
+
+              <div class="notif-list">
+                {% for item in shell_notifications %}
+                  {% if item.kind == 'account_request' %}
+                  <a class="notif-item" href="{{ url_for('auth.account_requests') }}#request-{{ item.request_id }}">
+                    <span class="notif-dot notif-dot-alert"></span>
+                    <span class="notif-item-copy">
+                      <strong>{{ item.title }}</strong>
+                      <small>{{ item.request_type }} · {{ item.requester_name }} · {{ item.created_at.strftime('%b %d, %Y') }}</small>
+                    </span>
+                  </a>
+                  {% else %}
+                  <a class="notif-item" href="{{ url_for('projects.detail', project_id=item.project_id) }}">
+                    <span class="notif-dot"></span>
+                    <span class="notif-item-copy">
+                      <strong>{{ item.title }}</strong>
+                      <small>{{ item.date.strftime('%b %d, %Y') }} · {{ item.project_name }}</small>
+                    </span>
+                  </a>
+                  {% endif %}
+                {% else %}
+                <div class="notif-empty">
+                  <strong>You're all caught up</strong>
+                  <small>No account requests or upcoming project milestones require your attention.</small>
+                </div>
+                {% endfor %}
+              </div>
+
+              <div class="notif-footer-actions">
+                {% if current_user.role == 'admin' and shell_account_request_count %}
+                <a class="notif-footer-link" href="{{ url_for('auth.account_requests') }}">Account requests ({{ shell_account_request_count }})</a>
+                {% endif %}
+                <a class="notif-footer-link" href="{{ url_for('projects.list_projects') }}">View projects →</a>
+              </div>
+            </div>
+          </details>
 
           <details class="user-menu">
             <summary>
@@ -101,6 +164,7 @@
               <span class="user-caret">⌄</span>
             </summary>
             <div class="user-dropdown">
+              <a href="{{ url_for('auth.profile') }}">My Profile</a>
               <a href="{{ url_for('auth.logout') }}">Logout</a>
             </div>
           </details>
@@ -136,6 +200,35 @@
   {% endif %}
 
   {% block scripts %}{% endblock %}
+  {% if show_shell and current_user.is_authenticated %}
+  <script>
+    (() => {
+      const menu = document.querySelector(".notif-menu[data-notification-signature]");
+      if (!menu) return;
+      const badge = menu.querySelector(".notif-badge");
+      const signature = menu.dataset.notificationSignature || "";
+      const key = `pmcm.notifications.seen.${menu.dataset.userId || "user"}`;
+
+      try {
+        if (!signature || window.localStorage.getItem(key) === signature) {
+          if (badge) badge.hidden = true;
+        }
+      } catch (error) {
+        // The notification dropdown still works when browser storage is unavailable.
+      }
+
+      menu.addEventListener("toggle", () => {
+        if (!menu.open || !signature) return;
+        if (badge) badge.hidden = true;
+        try {
+          window.localStorage.setItem(key, signature);
+        } catch (error) {
+          // Keep the visual acknowledgement for the current page even without storage.
+        }
+      });
+    })();
+  </script>
+  {% endif %}
 </body>
 
 </html>

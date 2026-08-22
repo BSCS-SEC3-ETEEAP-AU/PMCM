@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Team Competencies · SPM&ECD{% endblock %}
+{% block page_title %}Team Competencies{% endblock %}
+{% block page_subtitle %}Monitor employee proficiency, target coverage and development needs{% endblock %}
+
+{% block content %}
+<div class="module-toolbar">
+  <div class="module-search-wrap">
+    <span class="module-search-icon">⌕</span>
+    <input id="competencySearch" class="module-search" type="search" placeholder="Search employees, positions or teams..." aria-label="Search team competencies">
+  </div>
+  <div class="module-toolbar-actions">
+    <a class="btn secondary" href="{{ url_for('competency.list_skills') }}">Skills Catalog</a>
+    <a class="btn primary" href="{{ url_for('competency.gap_report') }}">View Gap Analysis</a>
+  </div>
+</div>
+
+<div class="module-kpi-row competency-kpi-row">
+  <div class="module-kpi-card mk-green">
+    <span class="module-kpi-icon">👥</span>
+    <div><span class="module-kpi-label">Team Members</span><strong>{{ summary.team_members }}</strong><small>Employees tracked</small></div>
+  </div>
+  <div class="module-kpi-card mk-blue">
+    <span class="module-kpi-icon">✓</span>
+    <div><span class="module-kpi-label">Assessed</span><strong>{{ summary.assessed_employees }}</strong><small>With competency records</small></div>
+  </div>
+  <div class="module-kpi-card mk-amber">
+    <span class="module-kpi-icon">!</span>
+    <div><span class="module-kpi-label">Competency Gaps</span><strong>{{ summary.total_gaps }}</strong><small>{{ summary.employees_with_gaps }} employees affected</small></div>
+  </div>
+  <div class="module-kpi-card mk-violet">
+    <span class="module-kpi-icon">◆</span>
+    <div><span class="module-kpi-label">Certifications</span><strong>{{ summary.certifications }}</strong><small>Recorded credentials</small></div>
+  </div>
+</div>
+
+<section class="module-panel module-table-panel">
+  <div class="module-panel-head">
+    <div>
+      <h2>Employee Competency Overview</h2>
+      <p>Target coverage compares recorded proficiency with the employee's current target levels.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table team-competency-table" id="teamCompetencyTable">
+      <thead>
+        <tr>
+          <th>Employee</th><th>Position / Team</th><th>Competencies</th><th>Target Coverage</th><th>Gaps</th><th>Status</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in rows %}
+        <tr data-search="{{ (row.employee.full_name ~ ' ' ~ (row.employee.position or '') ~ ' ' ~ (row.employee.team or ''))|lower }}">
+          <td>
+            <div class="employee-cell">
+              <span class="employee-avatar-sm">{{ row.employee.full_name[:1] }}</span>
+              <div>
+                <strong>{{ row.employee.full_name }}</strong>
+                <small>{{ row.employee.work_mode|title if row.employee.work_mode else '—' }}</small>
+              </div>
+            </div>
+          </td>
+          <td>
+            <div class="stacked-cell"><strong>{{ row.employee.position or '—' }}</strong><small>{{ row.employee.team or 'Unassigned team' }}</small></div>
+          </td>
+          <td>
+            <div class="stacked-cell"><strong>{{ row.competencies }}</strong><small>{{ row.certifications }} certification{{ '' if row.certifications == 1 else 's' }}</small></div>
+          </td>
+          <td>
+            {% if row.coverage is not none %}
+            <div class="coverage-cell">
+              <div class="mini-bar"><span style="width:{{ row.coverage }}%"></span></div>
+              <span>{{ row.coverage }}%</span>
+            </div>
+            {% else %}
+            <span class="muted">Not assessed</span>
+            {% endif %}
+          </td>
+          <td><span class="gap-badge {% if row.gaps == 0 %}gap-zero{% endif %}">{{ row.gaps }}</span></td>
+          <td>
+            {% if row.status == 'Meets Target' %}
+              <span class="status-pill status-completed">Meets Target</span>
+            {% elif row.status == 'Has Gaps' %}
+              <span class="status-pill status-in-review">Has Gaps</span>
+            {% else %}
+              <span class="status-pill status-not-started">Not Assessed</span>
+            {% endif %}
+          </td>
+          <td><a class="btn small" href="{{ url_for('competency.employee_profile', employee_id=row.employee.id) }}">View Profile</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="muted">No employee profiles are available.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div id="competencyNoResults" class="empty-state competency-no-results" hidden>No matching employees found.</div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (() => {
+    const search = document.getElementById('competencySearch');
+    const table = document.getElementById('teamCompetencyTable');
+    const empty = document.getElementById('competencyNoResults');
+    if (!search || !table) return;
+
+    search.addEventListener('input', () => {
+      const query = search.value.trim().toLowerCase();
+      const rows = Array.from(table.querySelectorAll('tbody tr[data-search]'));
+      let visible = 0;
+      rows.forEach(row => {
+        const match = !query || row.dataset.search.includes(query);
+        row.hidden = !match;
+        if (match) visible += 1;
+      });
+      if (empty) empty.hidden = visible !== 0 || rows.length === 0;
+    });
+  })();
+</script>
+{% endblock %}

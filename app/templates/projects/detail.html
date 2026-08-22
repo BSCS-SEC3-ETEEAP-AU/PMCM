@@ -1,15 +1,30 @@
 {% extends "base.html" %}
+{% block title %}{{ project.name }} · SPM&amp;ECD{% endblock %}
+{% block page_title %}Project Details{% endblock %}
+{% block page_subtitle %}Manage project delivery, tasks, team members, milestones and deadlines{% endblock %}
 {% block content %}
-<div class="row-between">
-  <h2>{{ project.name }}</h2>
-  <span class="status-pill status-{{ project.status|lower|replace(' ','') }}">{{ project.status }}</span>
+<div class="row-between project-detail-heading">
+  <div>
+    <h2>{{ project.name }}</h2>
+    {% if project.description %}<p class="muted project-description">{{ project.description }}</p>{% endif %}
+  </div>
+  <div class="project-detail-actions">
+    {% if can_manage_project %}<a class="btn secondary" href="{{ url_for('projects.edit_project', project_id=project.id) }}">Edit Project</a>{% endif %}
+    <span class="status-pill status-{{ project.status|lower|replace(' ','') }}">{{ project.status }}</span>
+  </div>
 </div>
-<p class="muted">Manager: {{ project.manager.full_name }} · Progress: {{ progress }}%</p>
+<div class="project-meta-row">
+  <span><strong>Manager:</strong> {{ project.manager.full_name }}</span>
+  <span><strong>Start:</strong> {{ project.start_date.strftime('%b %d, %Y') if project.start_date else '—' }}</span>
+  <span><strong>Target / Deadline:</strong> {{ project.target_date.strftime('%b %d, %Y') if project.target_date else '—' }}</span>
+  <span><strong>Progress:</strong> {{ progress }}%</span>
+</div>
 <div class="progress-bar"><span style="width:{{ progress }}%"></span></div>
 
 <div class="dash-grid">
   <div class="card">
-    <h3>Tasks (Kanban-style board)</h3>
+    <h3>Tasks</h3>
+    <p class="muted">Manage task assignments and workflow for this project.</p>
     <div class="board">
       {% for st in statuses %}
       <div class="board-col">
@@ -21,7 +36,8 @@
             <span class="prio prio-{{ t.priority|lower }}">{{ t.priority }}</span>
             {% if t.assignee %}<span>{{ t.assignee.full_name }}</span>{% endif %}
           </div>
-          {% if current_user.role in ('admin','manager') or (current_user.role == 'employee' and t.assignee and t.assignee.user_id == current_user.id) %}
+          {% if t.due_date %}<div class="ticket-due">Due {{ t.due_date.strftime('%b %d, %Y') }}</div>{% endif %}
+          {% if can_manage_project or (current_user.role == 'employee' and t.assignee and t.assignee.user_id == current_user.id) %}
           <form method="POST" action="{{ url_for('projects.update_task', task_id=t.id) }}">
             <select name="status" onchange="this.form.submit()">
               {% for s in statuses %}<option {% if s==t.status %}selected{% endif %}>{{ s }}</option>{% endfor %}
@@ -34,7 +50,7 @@
       {% endfor %}
     </div>
 
-    {% if current_user.role in ('admin','manager') %}
+    {% if can_manage_project %}
     <form class="inline-form" method="POST" action="{{ url_for('projects.create_task', project_id=project.id) }}">
       <input type="text" name="title" placeholder="New task title" required>
       <select name="assignee_id">
@@ -52,7 +68,7 @@
         {% for s in skills %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
       </select>
       <input type="number" name="required_level" value="3" min="1" max="5" title="Required level">
-      <input type="date" name="due_date">
+      <input type="date" name="due_date" title="Task due date">
       <button class="btn primary" type="submit">Add Task</button>
     </form>
     {% endif %}
@@ -61,20 +77,78 @@
   <div class="card">
     <h3>Team ({{ members|length }})</h3>
     <ul class="member-list">
-      {% for m in members %}<li>{{ m.full_name }} <small>· {{ m.position }} · {{ m.work_mode }}</small></li>{% endfor %}
+      {% for m in members %}<li>{{ m.full_name }} <small>· {{ m.position }} · {{ m.work_mode }}</small></li>{% else %}<li class="muted">No members assigned.</li>{% endfor %}
     </ul>
-    <h3>Milestones</h3>
-    <ul class="milestone-list">
+
+    <div class="project-section-head">
+      <div>
+        <h3>Milestones</h3>
+        <p class="muted">These milestone due dates feed the dashboard's Upcoming Deadlines card.</p>
+      </div>
+    </div>
+
+    <div class="milestone-stack">
       {% for ms in milestones %}
-      <li class="{% if ms.achieved %}done{% endif %}">{{ ms.title }} <small>· {{ ms.due_date }}</small></li>
+      <div class="milestone-item {% if ms.achieved %}done{% endif %}">
+        <div class="milestone-summary-row">
+          <div class="milestone-summary-main">
+            <div class="milestone-title-line">
+              <strong>{{ ms.title }}</strong>
+              {% if ms.achieved %}<span class="milestone-status complete">Completed</span>{% endif %}
+            </div>
+            <small class="milestone-date">{{ ('Due ' ~ ms.due_date.strftime('%b %d, %Y')) if ms.due_date else 'No due date' }}</small>
+          </div>
+          {% if can_manage_project %}
+          <details class="milestone-edit-details">
+            <summary class="btn small secondary">Edit</summary>
+            <form class="milestone-edit-form" method="POST" action="{{ url_for('projects.update_milestone', milestone_id=ms.id) }}">
+              <div class="milestone-field">
+                <label>Milestone title</label>
+                <input type="text" name="title" value="{{ ms.title }}" required>
+              </div>
+              <div class="milestone-field">
+                <label>Due date</label>
+                <input type="date" name="due_date" value="{{ ms.due_date.isoformat() if ms.due_date else '' }}">
+              </div>
+              <label class="milestone-check"><input type="checkbox" name="achieved" {% if ms.achieved %}checked{% endif %}> Mark as completed</label>
+              <div class="milestone-edit-actions">
+                <button class="btn small secondary" type="button" onclick="this.closest('details').removeAttribute('open')">Cancel</button>
+                <button class="btn small" type="submit">Save Changes</button>
+              </div>
+            </form>
+          </details>
+          {% endif %}
+        </div>
+      </div>
+      {% else %}
+      <p class="muted">No milestones yet.</p>
       {% endfor %}
-    </ul>
-    {% if current_user.role in ('admin','manager') %}
-    <form class="inline-form" method="POST" action="{{ url_for('projects.create_milestone', project_id=project.id) }}">
-      <input type="text" name="title" placeholder="Milestone title" required>
-      <input type="date" name="due_date">
-      <button class="btn" type="submit">Add</button>
-    </form>
+    </div>
+
+    {% if can_manage_project %}
+    <details class="milestone-create-details">
+      <summary class="btn">+ Add Milestone</summary>
+      <form class="milestone-create-form" method="POST" action="{{ url_for('projects.create_milestone', project_id=project.id) }}">
+        <div class="milestone-create-head">
+          <strong>New Milestone</strong>
+          <span class="muted">Add a project checkpoint and due date.</span>
+        </div>
+        <div class="milestone-create-grid">
+          <div class="milestone-field">
+            <label>Milestone title</label>
+            <input type="text" name="title" placeholder="e.g. UAT sign-off" required>
+          </div>
+          <div class="milestone-field">
+            <label>Due date</label>
+            <input type="date" name="due_date">
+          </div>
+        </div>
+        <div class="milestone-edit-actions">
+          <button class="btn small secondary" type="button" onclick="this.closest('details').removeAttribute('open')">Cancel</button>
+          <button class="btn small" type="submit">Add Milestone</button>
+        </div>
+      </form>
+    </details>
     {% endif %}
   </div>
 </div>

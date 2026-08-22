@@ -1,44 +1,61 @@
 {% extends "base.html" %}
+{% block page_title %}{% if own %}My Learning Recommendations{% else %}Learning Recommendations{% endif %}{% endblock %}
+{% block page_subtitle %}Rule-based learning suggestions generated from recorded competency gaps{% endblock %}
 {% block content %}
-<div class="row-between">
-  <h2>{% if own %}My Learning Recommendations{% else %}All Learning Recommendations{% endif %}</h2>
+<section class="module-toolbar learning-toolbar">
+  <div class="module-info-banner"><span>i</span><p>Recommendations are based on competency gaps and the Learning Resource Repository. No AI or machine learning is used.</p></div>
   {% if current_user.role in ('admin','manager') %}
-  <form method="POST" action="{{ url_for('recommendation.generate') }}" style="display:inline">
-    <button class="btn primary" type="submit">⚙ Run Recommendation Engine</button>
+  <form method="POST" action="{{ url_for('recommendation.generate') }}">
+    <button class="btn" type="submit">↻ Run Recommendation Engine</button>
   </form>
   {% endif %}
-</div>
-<p class="muted">Rule-based: compares each employee's competency gap against the Learning Resource Repository and recommends resources that build the missing proficiency.</p>
+</section>
 
-<table class="data-table">
-  <thead><tr><th>Employee</th><th>Skill</th><th>Gap</th><th>Recommended Resource</th><th>Reason</th><th>Status</th><th></th></tr></thead>
-  <tbody>
+<section class="learning-list">
   {% for r in recs %}
-    <tr>
-      <td>{{ r.employee.full_name }}</td>
-      <td>{{ r.skill.name }}</td>
-      <td><span class="gap-badge">{{ r.gap }}</span></td>
-      <td>{{ r.resource.title }}</td>
-      <td class="reason">{{ r.reason }}</td>
-      <td><span class="status-pill status-{{ r.status|lower }}">{{ r.status }}</span></td>
-      <td>
-        {% if r.status != 'Completed' %}
-        <form method="POST" action="{{ url_for('recommendation.complete', rec_id=r.id) }}">
-          <button class="btn small" type="submit">Mark Done</button>
-        </form>
-        {% else %}✓{% endif %}
-      </td>
-    </tr>
+  {% set priority = 'High' if r.gap >= 2 else 'Medium' %}
+  <article class="learning-card">
+    <div class="learning-resource-icon resource-{{ r.resource.resource_type|lower|replace(' ','-') }}">
+      {% if r.resource.resource_type == 'Certification' %}◆{% elif r.resource.resource_type == 'Article' %}▤{% else %}▣{% endif %}
+    </div>
+    <div class="learning-main">
+      <div class="learning-title-row">
+        <div>
+          <h2>{{ r.resource.title }}</h2>
+          <p>{{ r.resource.description or r.reason }}</p>
+        </div>
+        <span class="status-pill status-{{ r.status|lower|replace(' ','-') }}">{{ r.status }}</span>
+      </div>
+      <div class="learning-tags">
+        <span class="skill-tag">{{ r.skill.name }}</span>
+        <span>{{ r.resource.resource_type }}</span>
+        <span>Target Level {{ r.resource.target_level }}</span>
+      </div>
+    </div>
+    <div class="learning-meta">
+      <span>Priority</span>
+      <strong class="priority-label priority-{{ priority|lower }}"><i></i>{{ priority }}</strong>
+    </div>
+    <div class="learning-meta">
+      <span>Competency Gap</span>
+      <strong>{{ r.gap }} level{{ '' if r.gap == 1 else 's' }}</strong>
+    </div>
+    <div class="learning-actions">
+      {% if r.resource.url %}<a class="btn secondary small" href="{{ r.resource.url }}" target="_blank" rel="noopener">Open Resource</a>{% endif %}
+      {% if r.status != 'Completed' %}
+      <form method="POST" action="{{ url_for('recommendation.complete', rec_id=r.id) }}"><button class="btn small" type="submit">Mark Complete</button></form>
+      {% else %}<span class="completed-label">✓ Completed</span>{% endif %}
+    </div>
+  </article>
   {% else %}
-    <tr><td colspan="7" class="muted">No recommendations yet. Run the engine (managers) or complete assessments first.</td></tr>
+  <div class="empty-state learning-empty">No recommendations yet. Complete competency assessments first{% if current_user.role in ('admin','manager') %}, then run the recommendation engine{% endif %}.</div>
   {% endfor %}
-  </tbody>
-</table>
+</section>
 
 {% if current_user.role in ('admin','manager') %}
-<div style="margin-top:24px">
-  <a class="btn" href="{{ url_for('recommendation.list_resources') }}">Manage Learning Resources</a>
-  <a class="btn" href="{{ url_for('competency.gap_report') }}">View Gap Report</a>
+<div class="module-footer-actions">
+  <a class="btn secondary" href="{{ url_for('recommendation.list_resources') }}">Learning Resource Repository</a>
+  <a class="btn secondary" href="{{ url_for('competency.gap_report') }}">Competency Gap Report</a>
 </div>
 {% endif %}
 {% endblock %}

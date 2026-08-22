@@ -229,11 +229,18 @@
     height: 16px;
   }
 
-  .forgot {
+  .forgot,
+  .signup-link {
+    border: 0;
+    padding: 0;
+    background: transparent;
     color: #0d9488;
+    font: inherit;
+    cursor: pointer;
   }
 
-  .forgot:hover {
+  .forgot:hover,
+  .signup-link:hover {
     text-decoration: underline;
   }
 
@@ -259,11 +266,137 @@
     margin-top: 24px;
     color: #64748b;
     font-size: 14px;
+    line-height: 1.55;
   }
 
-  .signup a {
-    color: #0d9488;
+  .signup-question {
+    display: block;
+  }
+
+  .signup-link {
     font-weight: 600;
+  }
+
+  .account-help-dialog {
+    width: min(520px, calc(100vw - 32px));
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    border: 0;
+    border-radius: 14px;
+    padding: 0;
+    color: #0f172a;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, .22);
+  }
+
+  .account-help-dialog::backdrop {
+    background: rgba(15, 23, 42, .48);
+    backdrop-filter: blur(2px);
+  }
+
+  .account-help-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 24px 16px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .account-help-head h2 {
+    margin: 0 0 4px;
+    font-size: 20px;
+  }
+
+  .account-help-head p {
+    margin: 0;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .account-help-close {
+    border: 0;
+    background: transparent;
+    color: #64748b;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 2px;
+  }
+
+  .account-help-form {
+    display: grid;
+    gap: 14px;
+    padding: 20px 24px 24px;
+  }
+
+  .account-help-form label {
+    display: grid;
+    gap: 6px;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .account-help-form input,
+  .account-help-form select,
+  .account-help-form textarea {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: #fff;
+    color: #0f172a;
+    font: inherit;
+    outline: none;
+  }
+
+  .account-help-form textarea {
+    min-height: 90px;
+    resize: vertical;
+  }
+
+  .account-help-form input:focus,
+  .account-help-form select:focus,
+  .account-help-form textarea:focus {
+    border-color: #0d9488;
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, .12);
+  }
+
+  .account-help-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .account-help-actions button {
+    border-radius: 8px;
+    padding: 10px 16px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .account-help-cancel {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #334155;
+  }
+
+  .account-help-send {
+    border: 1px solid #0d9488;
+    background: #0d9488;
+    color: #fff;
+  }
+
+  .account-help-honeypot {
+    position: absolute !important;
+    left: -9999px !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
   }
 
   @media (max-width: 860px) {
@@ -360,15 +493,78 @@
 
         <div class="row-between">
           <label class="remember"><input type="checkbox" name="remember"> Remember me</label>
-          <a href="#" class="forgot" onclick="return false;">Forgot password?</a>
         </div>
 
         <button class="btn-signin" type="submit">Sign In</button>
 
-        <div class="signup">Don't have an account? <a href="#" onclick="return false;">Contact Administrator</a></div>
-
+        <div class="signup">
+          <span class="signup-question">Need an account or password reset?</span>
+          <button type="button" class="signup-link" data-help-reason="">Contact your system administrator.</button>
+        </div>
       </form>
+
+      <dialog class="account-help-dialog" id="account-help-dialog">
+        <div class="account-help-head">
+          <div>
+            <h2>Contact Administrator</h2>
+            <p>Send an account assistance request to the system administrators. No password is required.</p>
+          </div>
+          <button type="button" class="account-help-close" aria-label="Close">×</button>
+        </div>
+        <form class="account-help-form" method="POST" action="{{ url_for('auth.request_account_assistance') }}">
+          <label>Reason
+            <select name="request_type" id="account-help-reason" required>
+              <option value="" selected disabled>Select a reason</option>
+              <option value="Need an account">Need an account</option>
+              <option value="Password reset">Password reset</option>
+              <option value="Account locked / cannot sign in">Account locked / cannot sign in</option>
+              <option value="Other">Other</option>
+            </select>
+          </label>
+          <label>Name
+            <input type="text" name="requester_name" maxlength="120" placeholder="Enter your full name" required>
+          </label>
+          <label>Username or Email
+            <input type="text" name="requester_contact" id="account-help-contact" maxlength="120" placeholder="Enter your username or email" required>
+          </label>
+          <label>Message <span style="font-weight:400;color:#94a3b8;">(optional)</span>
+            <textarea name="message" maxlength="500" placeholder="Add any details that may help the administrator."></textarea>
+          </label>
+          <label class="account-help-honeypot" aria-hidden="true">Website
+            <input type="text" name="website" tabindex="-1" autocomplete="off">
+          </label>
+          <div class="account-help-actions">
+            <button type="button" class="account-help-cancel">Cancel</button>
+            <button type="submit" class="account-help-send">Send Request</button>
+          </div>
+        </form>
+      </dialog>
     </section>
   </div>
 </div>
+<script>
+  (() => {
+    const dialog = document.getElementById('account-help-dialog');
+    const reason = document.getElementById('account-help-reason');
+    const contact = document.getElementById('account-help-contact');
+    const loginIdentity = document.getElementById('username');
+    if (!dialog) return;
+
+    document.querySelectorAll('[data-help-reason]').forEach((trigger) => {
+      trigger.addEventListener('click', () => {
+        reason.value = trigger.dataset.helpReason || '';
+        if (loginIdentity && loginIdentity.value.trim() && !contact.value.trim()) {
+          contact.value = loginIdentity.value.trim();
+        }
+        dialog.showModal();
+      });
+    });
+
+    dialog.querySelector('.account-help-close').addEventListener('click', () => dialog.close());
+    dialog.querySelector('.account-help-cancel').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+  })();
+</script>
 {% endblock %}

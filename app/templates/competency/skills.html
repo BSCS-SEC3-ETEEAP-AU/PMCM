@@ -1,21 +1,63 @@
 {% extends "base.html" %}
+{% block title %}Skills Catalog · SPM&ECD{% endblock %}
+{% block page_title %}Skills Catalog{% endblock %}
+{% block page_subtitle %}{% if current_user.role == 'admin' %}Maintain the competency framework used across projects and assessments{% else %}Review the competency framework used across projects and assessments{% endif %}{% endblock %}
+
 {% block content %}
-<h2>Skills Catalog</h2>
-<table class="data-table">
-  <thead><tr><th>Skill</th><th>Category</th><th>Description</th></tr></thead>
-  <tbody>
-  {% for s in skills %}
-    <tr><td>{{ s.name }}</td><td>{{ s.category }}</td><td>{{ s.description }}</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
-<form class="form-card" method="POST" action="{{ url_for('competency.add_skill') }}">
-  <h3>Add Skill</h3>
+<div class="module-toolbar competency-toolbar">
+  <div class="module-info-banner">
+    <span>i</span>
+    {% if current_user.role == 'admin' %}
+    <p>Skills in this catalog are used by project requirements, competency assessments and learning recommendations.</p>
+    {% else %}
+    <p>This catalog is read-only for Project Managers. Administrators maintain the organization's competency framework.</p>
+    {% endif %}
+  </div>
+  <div class="module-toolbar-actions">
+    <a class="btn secondary" href="{{ url_for('competency.overview') }}">Team Competencies</a>
+    <a class="btn secondary" href="{{ url_for('competency.gap_report') }}">Gap Analysis</a>
+  </div>
+</div>
+
+<section class="module-panel module-table-panel">
+  <div class="module-panel-head">
+    <div>
+      <h2>Competency Framework</h2>
+      <p>{{ skills|length }} skills currently tracked</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table skills-table">
+      <thead><tr><th>Skill</th><th>Category</th><th>Description</th></tr></thead>
+      <tbody>
+      {% for s in skills %}
+        <tr>
+          <td><strong>{{ s.name }}</strong></td>
+          <td><span class="category-badge category-{{ (s.category or 'other')|lower|replace(' ', '-') }}">{{ s.category or 'Other' }}</span></td>
+          <td>{{ s.description or '—' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="3" class="muted">No skills have been added yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if current_user.role == 'admin' %}
+<form class="form-card skills-add-card" method="POST" action="{{ url_for('competency.add_skill') }}">
+  <div class="module-panel-head skills-form-head">
+    <div>
+      <h2>Add Skill</h2>
+      <p>Add a competency that can be used in project requirements and employee assessments.</p>
+    </div>
+  </div>
   <label>Name <input type="text" name="name" required></label>
   <label>Category
     <select name="category"><option>Technical</option><option>Soft</option><option>Domain</option></select>
   </label>
   <label>Description <input type="text" name="description"></label>
-  <button class="btn primary" type="submit">Add</button>
+  <button class="btn primary" type="submit">Add Skill</button>
 </form>
+{% endif %}
 {% endblock %}

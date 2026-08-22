@@ -1,18 +1,30 @@
 {% extends "base.html" %}
+{% block title %}User Accounts · SPM&ECD{% endblock %}
+{% block page_title %}User Accounts{% endblock %}
+{% block page_subtitle %}Manage role-based system access and review account assistance requests{% endblock %}
 {% block content %}
-<h2>User Accounts (RBAC)</h2>
-<table class="data-table">
-  <thead><tr><th>Username</th><th>Full Name</th><th>Position</th><th>Role</th><th>Work Mode</th><th>Status</th></tr></thead>
-  <tbody>
-  {% for u in users %}
-    <tr>
-      <td>{{ u.username }}</td><td>{{ u.full_name }}</td><td>{{ u.position }}</td>
-      <td><span class="role-badge role-{{ u.role }}">{{ u.role.title() }}</span></td>
-      <td>{{ u.work_mode }}</td>
-      <td>{% if u.is_active %}Active{% else %}Disabled{% endif %}</td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
-<p class="muted">New accounts are seeded via <code>seed.py</code>. Employee accounts link to a competency profile.</p>
+<div class="module-toolbar account-toolbar">
+  <div></div>
+  <div class="module-toolbar-actions">
+    <a class="btn secondary" href="{{ url_for('auth.account_requests') }}">Account Requests{% if open_request_count %} ({{ open_request_count }}){% endif %}</a>
+  </div>
+</div>
+<div class="module-panel">
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Username</th><th>Full Name</th><th>Position</th><th>Role</th><th>Work Mode</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for u in users %}
+        <tr>
+          <td>{{ u.username }}</td><td>{{ u.full_name }}</td><td>{{ u.position }}</td>
+          <td><span class="role-badge role-{{ u.role }}">{{ u.role.title() }}</span></td>
+          <td>{{ u.work_mode }}</td>
+          <td>{% if u.is_active %}<span class="account-status"><i></i>Active</span>{% else %}<span class="account-status disabled"><i></i>Disabled</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<p class="muted">Account provisioning remains Administrator-managed. Login assistance requests can be reviewed from Account Requests.</p>
 {% endblock %}

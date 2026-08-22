@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}My Profile · SPM&amp;ECD{% endblock %}
+{% block page_title %}Profile &amp; Settings{% endblock %}
+{% block page_subtitle %}Manage your account information and work preferences{% endblock %}
+
+{% block content %}
+<div class="settings-tabs" aria-label="Profile sections">
+  <span class="settings-tab active">Profile</span>
+</div>
+
+<div class="settings-grid">
+  <aside class="module-panel profile-settings-card">
+    <div class="settings-avatar">{{ current_user.full_name[:1] }}</div>
+    <h2>{{ current_user.full_name }}</h2>
+    <p>{{ current_user.position or current_user.role.title() }}</p>
+    <span class="role-badge role-{{ current_user.role }}">{{ current_user.role.title() }}</span>
+    <div class="settings-account-summary">
+      <div><span>Username</span><strong>{{ current_user.username }}</strong></div>
+      <div><span>Account Status</span><strong>{{ 'Active' if current_user.is_active else 'Disabled' }}</strong></div>
+      {% if employee and employee.team %}<div><span>Team</span><strong>{{ employee.team }}</strong></div>{% endif %}
+      <div><span>Member Since</span><strong>{{ current_user.created_at.strftime('%b %Y') if current_user.created_at else '—' }}</strong></div>
+    </div>
+  </aside>
+
+  <section class="module-panel settings-form-card">
+    <div class="module-panel-head">
+      <div>
+        <h2>Profile Information</h2>
+        <p>Update the personal information shown across the platform</p>
+      </div>
+    </div>
+    <form method="POST" class="settings-form">
+      <label>
+        <span>Full Name</span>
+        <input type="text" name="full_name" value="{{ current_user.full_name }}" required>
+      </label>
+      <label>
+        <span>Email</span>
+        <input type="email" name="email" value="{{ current_user.email or '' }}" placeholder="name@company.com">
+      </label>
+      <div class="settings-form-row">
+        <label>
+          <span>Position</span>
+          <input type="text" value="{{ current_user.position or '—' }}" readonly>
+          <small>Position is managed by an administrator.</small>
+        </label>
+        <label>
+          <span>Role</span>
+          <input type="text" value="{{ current_user.role|title }}" readonly>
+          <small>Role permissions cannot be changed from your profile.</small>
+        </label>
+      </div>
+      <label>
+        <span>Work Mode</span>
+        <select name="work_mode">
+          <option value="onsite" {% if current_user.work_mode == 'onsite' %}selected{% endif %}>Onsite</option>
+          <option value="hybrid" {% if current_user.work_mode == 'hybrid' %}selected{% endif %}>Hybrid</option>
+          <option value="remote" {% if current_user.work_mode == 'remote' %}selected{% endif %}>Remote</option>
+        </select>
+      </label>
+      <div class="settings-form-actions">
+        <a class="btn secondary" href="{{ url_for('main.dashboard') }}">Cancel</a>
+        <button class="btn primary" type="submit">Save Changes</button>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}
