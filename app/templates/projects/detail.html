@@ -21,6 +21,27 @@
 </div>
 <div class="progress-bar"><span style="width:{{ progress }}%"></span></div>
 
+<div class="card project-requirements-summary">
+  <div class="project-requirements-summary-head">
+    <div>
+      <h3>Required Skills &amp; Proficiency</h3>
+      <p class="muted">Project-level competency requirements used for team-fit evaluation.</p>
+    </div>
+    {% if can_manage_project %}<a class="btn small secondary" href="{{ url_for('projects.edit_project', project_id=project.id) }}">Edit Requirements</a>{% endif %}
+  </div>
+  <div class="project-requirements-chips">
+    {% set level_names = ['', 'Beginner', 'Basic', 'Intermediate', 'Advanced', 'Expert'] %}
+    {% for requirement in project_requirements %}
+    <div class="project-requirement-chip">
+      <strong>{{ requirement.skill.name }}</strong>
+      <span>Level {{ requirement.required_level }} · {{ level_names[requirement.required_level] }}</span>
+    </div>
+    {% else %}
+    <span class="muted">No project-level skill requirements have been defined yet.</span>
+    {% endfor %}
+  </div>
+</div>
+
 <div class="dash-grid">
   <div class="card">
     <h3>Tasks</h3>

@@ -133,6 +133,29 @@ class ProjectMember(db.Model):
     employee_id = db.Column(db.Integer, db.ForeignKey("employees.id"), nullable=False)
 
 
+class ProjectSkillRequirement(db.Model):
+    """Competency and proficiency level required by a project."""
+    __tablename__ = "project_skill_requirements"
+    __table_args__ = (
+        db.UniqueConstraint("project_id", "skill_id", name="uq_project_skill_requirement"),
+        db.CheckConstraint("required_level BETWEEN 1 AND 5", name="ck_project_skill_required_level"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(
+        db.Integer, db.ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    skill_id = db.Column(db.Integer, db.ForeignKey("skills.id"), nullable=False)
+    required_level = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    project = db.relationship(
+        "Project",
+        backref=db.backref("skill_requirements", cascade="all, delete-orphan"),
+    )
+    skill = db.relationship("Skill", backref="project_requirements")
+
+
 class Task(db.Model):
     """Task / work item within a project."""
     __tablename__ = "tasks"

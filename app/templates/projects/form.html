@@ -27,6 +27,41 @@
       <input type="date" name="target_date" value="{{ project.target_date.isoformat() if editing and project.target_date else request.form.get('target_date','') }}">
     </label>
   </div>
+
+  <fieldset class="project-requirements-fieldset">
+    <legend>Required Skills &amp; Proficiency</legend>
+    <p class="muted form-help">Define the competencies needed by this project. These requirements will be used to evaluate team-member skill alignment.</p>
+    <div class="project-requirements-list" id="projectRequirementsList">
+      {% set requirement_rows = project_requirements if project_requirements else [none] %}
+      {% for requirement in requirement_rows %}
+      <div class="project-requirement-row">
+        <label class="project-requirement-skill">Skill
+          <select name="requirement_skill_id">
+            <option value="">— Select required skill —</option>
+            {% for skill in skills %}
+            <option value="{{ skill.id }}" {% if requirement and requirement.skill_id == skill.id %}selected{% endif %}>{{ skill.name }}{% if skill.category %} · {{ skill.category }}{% endif %}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="project-requirement-level">Required Level
+          {% set selected_level = requirement.required_level if requirement else 3 %}
+          <select name="requirement_level">
+            {% for level, level_name in [(1,'Beginner'),(2,'Basic'),(3,'Intermediate'),(4,'Advanced'),(5,'Expert')] %}
+            <option value="{{ level }}" {% if selected_level == level %}selected{% endif %}>Level {{ level }} - {{ level_name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button class="project-requirement-remove" type="button" title="Remove skill requirement" aria-label="Remove skill requirement">×</button>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="project-requirement-actions">
+      <button class="btn small secondary project-requirement-add" id="addProjectRequirement" type="button">+ Add Skill Requirement</button>
+      <button class="btn small secondary project-skill-add" id="addNewProjectSkill" type="button">+ Add New Skill</button>
+    </div>
+    <p class="project-skill-catalog-message" id="projectSkillCatalogMessage" hidden></p>
+  </fieldset>
+
   <fieldset class="project-team-fieldset">
     <legend>Team Members</legend>
     {% if editing %}
@@ -114,6 +149,37 @@
   </div>
 </form>
 
+<dialog class="capacity-editor skill-catalog-editor" id="newSkillDialog">
+  <div class="capacity-editor-head">
+    <div>
+      <span class="capacity-editor-kicker">Skills catalog</span>
+      <h3>Add New Skill</h3>
+    </div>
+    <button type="button" class="capacity-editor-close" id="newSkillClose" aria-label="Close">×</button>
+  </div>
+  <div class="capacity-editor-body">
+    <p class="skill-catalog-editor-help">Use this when the project requires a competency that is not yet in the catalog. The new skill will also be available for future projects and competency assessments.</p>
+    <label>Skill Name
+      <input id="newSkillName" type="text" maxlength="120" placeholder="e.g. Apache Airflow" autocomplete="off">
+    </label>
+    <label>Category
+      <select id="newSkillCategory">
+        <option value="Technical">Technical</option>
+        <option value="Soft">Soft</option>
+        <option value="Domain">Domain</option>
+      </select>
+    </label>
+    <label>Description
+      <textarea id="newSkillDescription" rows="3" placeholder="Briefly describe this competency (optional)"></textarea>
+    </label>
+    <p class="capacity-editor-message" id="newSkillMessage" hidden></p>
+  </div>
+  <div class="capacity-editor-actions">
+    <button type="button" class="btn secondary" id="newSkillCancel">Cancel</button>
+    <button type="button" class="btn primary" id="newSkillSave">Add Skill</button>
+  </div>
+</dialog>
+
 {% if not editing %}
 <dialog class="capacity-editor" id="capacityEditor">
   <div class="capacity-editor-head">
@@ -151,6 +217,179 @@
 
 {% block scripts %}
 {{ super() }}
+<script>
+(() => {
+  const list = document.getElementById('projectRequirementsList');
+  const addButton = document.getElementById('addProjectRequirement');
+  const addSkillButton = document.getElementById('addNewProjectSkill');
+  const catalogMessage = document.getElementById('projectSkillCatalogMessage');
+  const dialog = document.getElementById('newSkillDialog');
+  if (!list || !addButton || !addSkillButton || !dialog) return;
+
+  const nameInput = document.getElementById('newSkillName');
+  const categoryInput = document.getElementById('newSkillCategory');
+  const descriptionInput = document.getElementById('newSkillDescription');
+  const dialogMessage = document.getElementById('newSkillMessage');
+  const saveButton = document.getElementById('newSkillSave');
+  const rows = () => Array.from(list.querySelectorAll('.project-requirement-row'));
+
+  const syncRemoveButtons = () => {
+    rows().forEach(row => {
+      const removeButton = row.querySelector('.project-requirement-remove');
+      if (removeButton) removeButton.disabled = rows().length === 1;
+    });
+  };
+
+  const bindRow = row => {
+    const removeButton = row.querySelector('.project-requirement-remove');
+    if (!removeButton || removeButton.dataset.bound === '1') return;
+    removeButton.dataset.bound = '1';
+    removeButton.addEventListener('click', () => {
+      if (rows().length <= 1) return;
+      row.remove();
+      syncRemoveButtons();
+    });
+  };
+
+  const appendRequirementRow = () => {
+    const source = rows()[0];
+    if (!source) return null;
+    const row = source.cloneNode(true);
+    const skill = row.querySelector('select[name="requirement_skill_id"]');
+    const level = row.querySelector('select[name="requirement_level"]');
+    const removeButton = row.querySelector('.project-requirement-remove');
+    if (skill) skill.value = '';
+    if (level) level.value = '3';
+    if (removeButton) delete removeButton.dataset.bound;
+    bindRow(row);
+    list.appendChild(row);
+    syncRemoveButtons();
+    return row;
+  };
+
+  const addSkillOption = skill => {
+    const value = String(skill.id);
+    const label = `${skill.name}${skill.category ? ` · ${skill.category}` : ''}`;
+    rows().forEach(row => {
+      const select = row.querySelector('select[name="requirement_skill_id"]');
+      if (!select || Array.from(select.options).some(option => option.value === value)) return;
+      const option = new Option(label, value);
+      select.add(option);
+      const selectedValue = select.value;
+      const placeholder = select.options[0];
+      const options = Array.from(select.options).slice(1).sort((a, b) => a.text.localeCompare(b.text));
+      select.innerHTML = '';
+      select.appendChild(placeholder);
+      options.forEach(item => select.appendChild(item));
+      select.value = selectedValue;
+    });
+  };
+
+  const selectSkillForRequirement = skill => {
+    const value = String(skill.id);
+    addSkillOption(skill);
+    const selects = rows().map(row => row.querySelector('select[name="requirement_skill_id"]')).filter(Boolean);
+    const alreadySelected = selects.find(select => select.value === value);
+    if (alreadySelected) {
+      alreadySelected.focus();
+      return false;
+    }
+
+    let target = selects.find(select => !select.value);
+    if (!target) {
+      const row = appendRequirementRow();
+      target = row ? row.querySelector('select[name="requirement_skill_id"]') : null;
+    }
+    if (target) {
+      target.value = value;
+      target.focus();
+    }
+    return true;
+  };
+
+  const showCatalogMessage = (text, tone = 'success') => {
+    catalogMessage.textContent = text;
+    catalogMessage.classList.toggle('is-info', tone === 'info');
+    catalogMessage.hidden = false;
+  };
+
+  const closeSkillDialog = () => {
+    dialogMessage.hidden = true;
+    dialogMessage.textContent = '';
+    dialog.close();
+  };
+
+  rows().forEach(bindRow);
+  syncRemoveButtons();
+
+  addButton.addEventListener('click', () => {
+    const row = appendRequirementRow();
+    const skill = row ? row.querySelector('select[name="requirement_skill_id"]') : null;
+    if (skill) skill.focus();
+  });
+
+  addSkillButton.addEventListener('click', () => {
+    nameInput.value = '';
+    categoryInput.value = 'Technical';
+    descriptionInput.value = '';
+    dialogMessage.hidden = true;
+    catalogMessage.hidden = true;
+    dialog.showModal();
+    nameInput.focus();
+  });
+
+  document.getElementById('newSkillClose').addEventListener('click', closeSkillDialog);
+  document.getElementById('newSkillCancel').addEventListener('click', closeSkillDialog);
+  dialog.addEventListener('cancel', event => {
+    event.preventDefault();
+    closeSkillDialog();
+  });
+
+  saveButton.addEventListener('click', async () => {
+    const name = nameInput.value.trim();
+    if (!name) {
+      dialogMessage.textContent = 'Skill name is required.';
+      dialogMessage.hidden = false;
+      nameInput.focus();
+      return;
+    }
+
+    saveButton.disabled = true;
+    saveButton.textContent = 'Adding...';
+    dialogMessage.hidden = true;
+    try {
+      const response = await fetch("{{ url_for('projects.add_project_skill') }}", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+          name,
+          category: categoryInput.value,
+          description: descriptionInput.value.trim()
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.message || 'Unable to add skill.');
+
+      const selected = selectSkillForRequirement(data.skill);
+      if (!selected) {
+        showCatalogMessage(`'${data.skill.name}' is already in this project's skill requirements.`, 'info');
+      } else {
+        showCatalogMessage(data.message, data.existing ? 'info' : 'success');
+      }
+      closeSkillDialog();
+    } catch (error) {
+      dialogMessage.textContent = error.message;
+      dialogMessage.hidden = false;
+    } finally {
+      saveButton.disabled = false;
+      saveButton.textContent = 'Add Skill';
+    }
+  });
+})();
+</script>
 {% if not editing %}
 <script>
 (() => {

@@ -7,7 +7,8 @@ Manager/Admin create projects & tasks; Employees update their task status.
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
 from ..models import (
-    db, Project, Task, Employee, ProjectMember, Milestone, Skill, User,
+    db, Project, Task, Employee, ProjectMember, ProjectSkillRequirement,
+    Milestone, Skill, User,
 )
 from ..decorators import manager_required
 
@@ -78,6 +79,104 @@ def _available_employees(capacity_map):
     ]
 
 
+def _parse_project_requirements(valid_skill_ids):
+    """Parse project competency requirements submitted by the project form."""
+    skill_values = request.form.getlist("requirement_skill_id")
+    level_values = request.form.getlist("requirement_level")
+    row_count = max(len(skill_values), len(level_values))
+    requirements = []
+    seen_skill_ids = set()
+
+    for index in range(row_count):
+        skill_value = skill_values[index].strip() if index < len(skill_values) else ""
+        level_value = level_values[index].strip() if index < len(level_values) else ""
+        if not skill_value:
+            continue
+        if not skill_value.isdigit() or int(skill_value) not in valid_skill_ids:
+            return requirements, "Please select a valid skill for each project requirement."
+        if not level_value.isdigit() or not 1 <= int(level_value) <= 5:
+            return requirements, "Required proficiency must be between Level 1 and Level 5."
+
+        skill_id = int(skill_value)
+        if skill_id in seen_skill_ids:
+            return requirements, "Each skill can only be added once to a project."
+        seen_skill_ids.add(skill_id)
+        requirements.append({
+            "skill_id": skill_id,
+            "required_level": int(level_value),
+        })
+
+    return requirements, None
+
+
+def _saved_project_requirements(project):
+    """Return existing project requirements in form-friendly order."""
+    return [
+        {"skill_id": requirement.skill_id, "required_level": requirement.required_level}
+        for requirement in sorted(
+            project.skill_requirements,
+            key=lambda requirement: requirement.skill.name.lower(),
+        )
+    ]
+
+
+def _replace_project_requirements(project_id, requirements):
+    """Replace all competency requirements for a project."""
+    ProjectSkillRequirement.query.filter_by(project_id=project_id).delete(
+        synchronize_session=False
+    )
+    for requirement in requirements:
+        db.session.add(ProjectSkillRequirement(
+            project_id=project_id,
+            skill_id=requirement["skill_id"],
+            required_level=requirement["required_level"],
+        ))
+
+
+@projects_bp.route("/skills/add", methods=["POST"])
+@manager_required
+def add_project_skill():
+    """Allow a Manager/Admin to add a missing competency while planning a project."""
+    payload = request.get_json(silent=True) or request.form
+    name = " ".join(str(payload.get("name", "")).split())
+    category = str(payload.get("category", "Technical")).strip().title()
+    description = str(payload.get("description", "")).strip()
+
+    if not name:
+        return {"ok": False, "message": "Skill name is required."}, 400
+    if len(name) > 120:
+        return {"ok": False, "message": "Skill name must be 120 characters or fewer."}, 400
+    if category not in ("Technical", "Soft", "Domain"):
+        return {"ok": False, "message": "Please select a valid skill category."}, 400
+
+    existing = Skill.query.filter(db.func.lower(Skill.name) == name.lower()).first()
+    if existing:
+        return {
+            "ok": True,
+            "existing": True,
+            "message": f"'{existing.name}' already exists in the Skills Catalog and was selected.",
+            "skill": {
+                "id": existing.id,
+                "name": existing.name,
+                "category": existing.category or category,
+            },
+        }
+
+    skill = Skill(name=name, category=category, description=description)
+    db.session.add(skill)
+    db.session.commit()
+    return {
+        "ok": True,
+        "existing": False,
+        "message": f"'{skill.name}' was added to the Skills Catalog and selected for this project.",
+        "skill": {
+            "id": skill.id,
+            "name": skill.name,
+            "category": skill.category,
+        },
+    }
+
+
 @projects_bp.route("/")
 @login_required
 def list_projects():
@@ -121,6 +220,10 @@ def list_projects():
 @manager_required
 def create_project():
     capacity_map = _employee_capacity_map()
+    skills = Skill.query.order_by(Skill.name).all()
+    valid_skill_ids = {skill.id for skill in skills}
+    project_requirements = []
+
     # Show the full workforce for manager visibility, but only eligible employees
     # can be selected for a new project assignment.
     employees = Employee.query.order_by(Employee.full_name).all()
@@ -138,12 +241,26 @@ def create_project():
         if capacity_map.get(employee.id, {}).get("is_available")
     }
     selected_member_ids = set()
+
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         status = request.form.get("status", "Active")
         selected_member_ids = {
             int(emp_id) for emp_id in request.form.getlist("members") if emp_id.isdigit()
         }
+        project_requirements, requirement_error = _parse_project_requirements(
+            valid_skill_ids
+        )
+        if requirement_error:
+            flash(requirement_error, "danger")
+            return render_template(
+                "projects/form.html",
+                employees=employees, skills=skills, project=None,
+                project_requirements=project_requirements,
+                selected_member_ids=selected_member_ids,
+                project_statuses=PROJECT_STATUSES, employee_capacity=capacity_map,
+            )
+
         invalid_member_ids = selected_member_ids - available_employee_ids
         if invalid_member_ids:
             flash(
@@ -154,32 +271,30 @@ def create_project():
             selected_member_ids &= available_employee_ids
             return render_template(
                 "projects/form.html",
-                employees=employees,
-                project=None,
+                employees=employees, skills=skills, project=None,
+                project_requirements=project_requirements,
                 selected_member_ids=selected_member_ids,
-                project_statuses=PROJECT_STATUSES,
-                employee_capacity=capacity_map,
+                project_statuses=PROJECT_STATUSES, employee_capacity=capacity_map,
             )
         if not name:
             flash("Project name is required.", "danger")
             return render_template(
                 "projects/form.html",
-                employees=employees,
-                project=None,
+                employees=employees, skills=skills, project=None,
+                project_requirements=project_requirements,
                 selected_member_ids=selected_member_ids,
-                project_statuses=PROJECT_STATUSES,
-                employee_capacity=capacity_map,
+                project_statuses=PROJECT_STATUSES, employee_capacity=capacity_map,
             )
         if status not in PROJECT_STATUSES:
             flash("Invalid project status.", "danger")
             return render_template(
                 "projects/form.html",
-                employees=employees,
-                project=None,
+                employees=employees, skills=skills, project=None,
+                project_requirements=project_requirements,
                 selected_member_ids=selected_member_ids,
-                project_statuses=PROJECT_STATUSES,
-                employee_capacity=capacity_map,
+                project_statuses=PROJECT_STATUSES, employee_capacity=capacity_map,
             )
+
         proj = Project(
             name=name,
             description=request.form.get("description", ""),
@@ -192,16 +307,17 @@ def create_project():
         db.session.flush()
         for emp_id in selected_member_ids:
             db.session.add(ProjectMember(project_id=proj.id, employee_id=emp_id))
+        _replace_project_requirements(proj.id, project_requirements)
         db.session.commit()
         flash(f"Project '{name}' created.", "success")
         return redirect(url_for("projects.detail", project_id=proj.id))
+
     return render_template(
         "projects/form.html",
-        employees=employees,
-        project=None,
+        employees=employees, skills=skills, project=None,
+        project_requirements=project_requirements,
         selected_member_ids=selected_member_ids,
-        project_statuses=PROJECT_STATUSES,
-        employee_capacity=capacity_map,
+        project_statuses=PROJECT_STATUSES, employee_capacity=capacity_map,
     )
 
 
@@ -211,7 +327,10 @@ def edit_project(project_id):
     project = Project.query.get_or_404(project_id)
     _require_project_manager(project)
     employees = Employee.query.order_by(Employee.full_name).all()
+    skills = Skill.query.order_by(Skill.name).all()
+    valid_skill_ids = {skill.id for skill in skills}
     selected_member_ids = _selected_member_ids(project_id)
+    project_requirements = _saved_project_requirements(project)
 
     if request.method == "POST":
         name = request.form.get("name", "").strip()
@@ -219,13 +338,25 @@ def edit_project(project_id):
         posted_member_ids = {
             int(emp_id) for emp_id in request.form.getlist("members") if emp_id.isdigit()
         }
+        project_requirements, requirement_error = _parse_project_requirements(
+            valid_skill_ids
+        )
+        if requirement_error:
+            flash(requirement_error, "danger")
+            return render_template(
+                "projects/form.html",
+                employees=employees, skills=skills, project=project,
+                project_requirements=project_requirements,
+                selected_member_ids=posted_member_ids,
+                project_statuses=PROJECT_STATUSES,
+            )
 
         if not name:
             flash("Project name is required.", "danger")
             return render_template(
                 "projects/form.html",
-                employees=employees,
-                project=project,
+                employees=employees, skills=skills, project=project,
+                project_requirements=project_requirements,
                 selected_member_ids=posted_member_ids,
                 project_statuses=PROJECT_STATUSES,
             )
@@ -233,8 +364,8 @@ def edit_project(project_id):
             flash("Invalid project status.", "danger")
             return render_template(
                 "projects/form.html",
-                employees=employees,
-                project=project,
+                employees=employees, skills=skills, project=project,
+                project_requirements=project_requirements,
                 selected_member_ids=posted_member_ids,
                 project_statuses=PROJECT_STATUSES,
             )
@@ -256,8 +387,8 @@ def edit_project(project_id):
             )
             return render_template(
                 "projects/form.html",
-                employees=employees,
-                project=project,
+                employees=employees, skills=skills, project=project,
+                project_requirements=project_requirements,
                 selected_member_ids=posted_member_ids,
                 project_statuses=PROJECT_STATUSES,
             )
@@ -276,14 +407,15 @@ def edit_project(project_id):
         for emp_id in posted_member_ids - existing_ids:
             db.session.add(ProjectMember(project_id=project_id, employee_id=emp_id))
 
+        _replace_project_requirements(project_id, project_requirements)
         db.session.commit()
         flash(f"Project '{project.name}' updated.", "success")
         return redirect(url_for("projects.detail", project_id=project.id))
 
     return render_template(
         "projects/form.html",
-        employees=employees,
-        project=project,
+        employees=employees, skills=skills, project=project,
+        project_requirements=project_requirements,
         selected_member_ids=selected_member_ids,
         project_statuses=PROJECT_STATUSES,
     )
@@ -317,6 +449,9 @@ def detail(project_id):
     )
     milestones = Milestone.query.filter_by(project_id=project_id).order_by(Milestone.due_date).all()
     skills = Skill.query.order_by(Skill.name).all()
+    project_requirements = sorted(
+        project.skill_requirements, key=lambda requirement: requirement.skill.name.lower()
+    )
 
     total = len(tasks)
     done = sum(1 for t in tasks if t.status == "Done")
@@ -327,6 +462,7 @@ def detail(project_id):
         "projects/detail.html",
         project=project, tasks=tasks, members=members,
         milestones=milestones, skills=skills, employees=members,
+        project_requirements=project_requirements,
         progress=progress, statuses=TASK_STATUSES,
         can_manage_project=can_manage_project,
     )

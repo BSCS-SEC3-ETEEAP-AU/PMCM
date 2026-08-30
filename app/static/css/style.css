@@ -3928,3 +3928,176 @@ a.module-kpi-card:hover {
     gap: 3px;
   }
 }
+
+/* Project-level skill requirements */
+.project-requirements-fieldset {
+  margin: 4px 0 2px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfcfe;
+}
+
+.project-requirements-fieldset legend {
+  padding: 0 6px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.project-requirements-list {
+  display: grid;
+  gap: 10px;
+}
+
+.project-requirement-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(190px, 0.9fr) 36px;
+  align-items: end;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.project-requirement-row label {
+  margin: 0 !important;
+}
+
+.project-requirement-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.project-requirement-remove:hover:not(:disabled) {
+  border-color: #fca5a5;
+  background: #fff7f7;
+  color: #dc2626;
+}
+
+.project-requirement-remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.project-requirement-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.project-requirement-add,
+.project-skill-add {
+  margin: 0;
+}
+
+.project-skill-catalog-message {
+  margin: 9px 0 0;
+  padding: 8px 10px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #047857;
+  font-size: 10px;
+}
+
+.project-skill-catalog-message.is-info {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.skill-catalog-editor-help {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.skill-catalog-editor .capacity-editor-body textarea {
+  width: 100%;
+  min-height: 82px;
+  resize: vertical;
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  padding: 9px 10px;
+  font: inherit;
+  font-weight: 400;
+}
+
+.project-requirements-summary {
+  margin-top: 14px;
+}
+
+.project-requirements-summary-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.project-requirements-summary-head h3 {
+  margin: 0 0 3px;
+}
+
+.project-requirements-summary-head p {
+  margin: 0;
+  font-size: 11px;
+}
+
+.project-requirements-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.project-requirement-chip {
+  display: grid;
+  gap: 2px;
+  min-width: 170px;
+  padding: 9px 11px;
+  border: 1px solid #dbeafe;
+  border-radius: 9px;
+  background: #f8fbff;
+}
+
+.project-requirement-chip strong {
+  color: #1e293b;
+  font-size: 12px;
+}
+
+.project-requirement-chip span {
+  color: #64748b;
+  font-size: 10px;
+}
+
+@media (max-width: 760px) {
+  .project-requirement-row {
+    grid-template-columns: 1fr;
+  }
+
+  .project-requirement-remove {
+    width: 100%;
+    height: 34px;
+  }
+
+  .project-requirements-summary-head {
+    flex-direction: column;
+  }
+}
