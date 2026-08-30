@@ -48,11 +48,11 @@ class User(UserMixin, db.Model):
 
 
 class Employee(db.Model):
-    """Competency profile of a staff member (links to User when applicable)."""
+    """Competency profile of a staff member linked to a system user account."""
     __tablename__ = "employees"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, unique=True)
     full_name = db.Column(db.String(120), nullable=False)
     position = db.Column(db.String(80))
     team = db.Column(db.String(80))  # e.g. Software Engineering, Data Engineering, Data Analytics
@@ -309,7 +309,7 @@ class AccountAssistanceRequest(db.Model):
     status = db.Column(db.String(20), nullable=False, default="Open")  # Open | Resolved
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     resolved_at = db.Column(db.DateTime)
-    resolved_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    resolved_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, unique=True)
 
     resolved_by = db.relationship("User", foreign_keys=[resolved_by_user_id])
 

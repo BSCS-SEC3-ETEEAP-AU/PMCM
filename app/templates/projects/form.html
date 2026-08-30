@@ -78,7 +78,7 @@
     {% if editing %}
     <p class="muted form-help">Only project members can be selected as task assignees.</p>
     {% else %}
-    <p class="muted form-help">All employees are shown for workforce visibility. Available employees with remaining capacity can be selected and are ranked by skill alignment when project requirements are defined. Unavailable and at-capacity employees remain at the bottom.</p>
+    <p class="muted form-help">Active-account team members are shown for workforce visibility. Available employees with remaining capacity can be selected and are ranked by skill alignment when project requirements are defined. Unavailable and at-capacity employees remain at the bottom.</p>
     {% endif %}
     <div class="member-filter-bar" aria-label="Team member filters">
       <div class="member-filter-group">
@@ -98,6 +98,7 @@
     </div>
     <div class="member-select-grid">
       {% for e in employees %}
+      {% set account_active = e.id in active_account_employee_ids if active_account_employee_ids is defined else true %}
       {% set capacity = employee_capacity.get(e.id) if employee_capacity is defined else none %}
       {% set availability = capacity.availability_status if capacity else 'Available' %}
       {% set at_capacity = capacity.at_capacity if capacity else false %}
@@ -119,12 +120,14 @@
               name="members"
               value="{{ e.id }}"
               {% if e.id in selected_member_ids %}checked{% endif %}
-              {% if not editing and not eligible %}disabled{% endif %}
+              {% if (not editing and not eligible) or (editing and not account_active) %}disabled{% endif %}
             >
+            {% if editing and not account_active and e.id in selected_member_ids %}<input type="hidden" name="members" value="{{ e.id }}">{% endif %}
             <div class="member-select-identity">
               <div class="member-name-line">
                 <strong>{{ e.full_name }}</strong>
                 <span class="member-position-title">{{ e.position or 'Position not set' }}</span>
+                {% if editing and not account_active %}<span class="member-position-title">Account Disabled · historical member</span>{% endif %}
               </div>
               <span class="member-team-name">{{ e.team or 'Department / team not assigned' }}</span>
             </div>

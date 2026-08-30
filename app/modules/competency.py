@@ -138,7 +138,12 @@ def list_employees():
     if current_user.role not in ("admin", "manager"):
         abort(403)
 
-    employees = Employee.query.order_by(Employee.full_name).all()
+    employees = (
+        Employee.query
+        .join(User, User.id == Employee.user_id)
+        .order_by(Employee.full_name)
+        .all()
+    )
     return render_template("competency/employees.html", employees=employees)
 
 

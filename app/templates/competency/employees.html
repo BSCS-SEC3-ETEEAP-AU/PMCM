@@ -35,7 +35,7 @@
           <th>Position</th>
           <th>Team</th>
           <th>Work Mode</th>
-          <th>Status</th>
+          <th>Account Status</th>
           <th class="module-action-cell">Action</th>
         </tr>
       </thead>
@@ -47,7 +47,7 @@
               <span class="employee-avatar-sm">{{ e.full_name[:1] }}</span>
               <div>
                 <strong>{{ e.full_name }}</strong>
-                <small>{{ e.user.email if e.user and e.user.email else 'Employee profile' }}</small>
+                <small>{{ e.user.email or e.user.username }}</small>
               </div>
             </div>
           </td>
@@ -55,11 +55,7 @@
           <td>{{ e.team or '—' }}</td>
           <td><span class="workmode-badge workmode-{{ (e.work_mode or 'hybrid')|lower }}">{{ (e.work_mode or 'hybrid')|title }}</span></td>
           <td>
-            {% if e.user %}
-              {% if e.user.is_active %}<span class="account-status active"><i></i>Active</span>{% else %}<span class="account-status disabled"><i></i>Disabled</span>{% endif %}
-            {% else %}
-              <span class="account-status profile-only"><i></i>Profile Only</span>
-            {% endif %}
+            {% if e.user.is_active %}<span class="account-status active"><i></i>Active</span>{% else %}<span class="account-status disabled"><i></i>Disabled</span>{% endif %}
           </td>
           <td class="module-action-cell"><a class="btn primary small" href="{{ url_for('competency.employee_profile', employee_id=e.id) }}">View Competencies</a></td>
         </tr>
@@ -73,11 +69,11 @@
 <div class="team-summary-row">
   <article class="module-kpi-card team-summary-card mk-green">
     <span class="module-kpi-icon">♙</span>
-    <div><span class="module-kpi-label">Total Members</span><strong>{{ employees|length }}</strong><small>Employee profiles</small></div>
+    <div><span class="module-kpi-label">Total Members</span><strong>{{ employees|length }}</strong><small>Linked workforce accounts</small></div>
   </article>
   <article class="module-kpi-card team-summary-card mk-blue">
     <span class="module-kpi-icon">✓</span>
-    <div><span class="module-kpi-label">Active Accounts</span><strong>{{ active_count.value }}</strong><small>Linked system users</small></div>
+    <div><span class="module-kpi-label">Active Accounts</span><strong>{{ active_count.value }}</strong><small>Enabled login accounts</small></div>
   </article>
   <article class="module-kpi-card team-summary-card mk-amber">
     <span class="module-kpi-icon">◇</span>

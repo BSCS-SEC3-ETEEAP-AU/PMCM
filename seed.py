@@ -11,7 +11,6 @@ from app.models import (
     db, User, Employee, Skill, Certification, CompetencyAssessment,
     Project, ProjectMember, Task, Milestone, LearningResource,
 )
-from werkzeug.security import generate_password_hash
 
 app = create_app()
 with app.app_context():
@@ -33,19 +32,30 @@ with app.app_context():
     db.session.commit()
 
     # ---- Employees (multidisciplinary TMC team) ----
+    # Every workforce profile has a login account so assigned staff can access
+    # their projects, tasks, competencies, and learning recommendations.
     emp_data = [
-        ("Maria Santos", "Software Engineer", "Software Engineering", "hybrid"),
-        ("John Cruz", "Software Engineer", "Software Engineering", "onsite"),
-        ("Anna Reyes", "Data Engineer", "Data Engineering", "remote"),
-        ("Paolo Diaz", "Data Engineer", "Data Engineering", "hybrid"),
-        ("Liza Torres", "Data Analyst", "Data Analytics", "remote"),
-        ("Mark Lim", "Data Analyst", "Data Analytics", "onsite"),
+        ("emp_maria", "Maria Santos", "m.santos@tmc.edu.ph", "Software Engineer", "Software Engineering", "hybrid"),
+        ("emp_john", "John Cruz", "j.cruz@tmc.edu.ph", "Software Engineer", "Software Engineering", "onsite"),
+        ("emp_anna", "Anna Reyes", "a.reyes@tmc.edu.ph", "Data Engineer", "Data Engineering", "remote"),
+        ("emp_paolo", "Paolo Diaz", "p.diaz@tmc.edu.ph", "Data Engineer", "Data Engineering", "hybrid"),
+        ("emp_liza", "Liza Torres", "l.torres@tmc.edu.ph", "Data Analyst", "Data Analytics", "remote"),
+        ("emp_mark", "Mark Lim", "m.lim@tmc.edu.ph", "Data Analyst", "Data Analytics", "onsite"),
     ]
     employees = []
-    for name, pos, team, mode in emp_data:
-        e = Employee(full_name=name, position=pos, team=team, work_mode=mode)
-        employees.append(e)
-        db.session.add(e)
+    for username, name, email, pos, team, mode in emp_data:
+        user = User(
+            username=username, full_name=name, email=email, role="employee",
+            position=pos, work_mode=mode, is_active=True,
+        )
+        user.set_password("password123")
+        db.session.add(user)
+        db.session.flush()
+        employee = Employee(
+            user_id=user.id, full_name=name, position=pos, team=team, work_mode=mode
+        )
+        employees.append(employee)
+        db.session.add(employee)
     db.session.commit()
 
     # Privileged accounts are still employees: role controls permissions,
@@ -64,15 +74,6 @@ with app.app_context():
         )
         role_profiles[key] = profile
         db.session.add(profile)
-    db.session.commit()
-
-    # Dedicated employee account (role-restricted views)
-    emp_user = User(username="emp_liza", full_name="Liza Torres",
-                    email="l.torres@tmc.edu.ph", role="employee", position="Data Analyst")
-    emp_user.set_password("password123")
-    db.session.add(emp_user)
-    db.session.commit()
-    employees[4].user_id = emp_user.id  # Liza Torres
     db.session.commit()
 
     # ---- Skills catalog ----
@@ -205,4 +206,5 @@ with app.app_context():
     print("  admin      (Administrator)")
     print("  mgr_gueco  (Manager)")
     print("  mgr_buban  (Manager)")
-    print("  emp_liza   (Employee - Data Analyst)")
+    print("  emp_maria / emp_john / emp_anna / emp_paolo / emp_liza / emp_mark")
+    print("             (Employee accounts)")

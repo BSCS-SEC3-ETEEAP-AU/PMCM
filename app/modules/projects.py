@@ -42,6 +42,17 @@ def _selected_member_ids(project_id):
     }
 
 
+def _active_account_employees():
+    """Return workforce profiles backed by an enabled login account."""
+    return (
+        Employee.query
+        .join(User, User.id == Employee.user_id)
+        .filter(User.is_active.is_(True))
+        .order_by(Employee.full_name)
+        .all()
+    )
+
+
 def _employee_capacity_map():
     """Return active project workload and remaining capacity for each employee."""
     active_counts = dict(
@@ -53,7 +64,7 @@ def _employee_capacity_map():
     )
 
     capacity_map = {}
-    for employee in Employee.query.order_by(Employee.full_name).all():
+    for employee in _active_account_employees():
         active_projects = active_counts.get(employee.id, 0)
         stored_capacity = max(0, employee.project_capacity or 0)
         # Existing demo data may predate capacity controls. Never present a
@@ -78,7 +89,7 @@ def _available_employees(capacity_map):
     """Employees eligible to accept a new project assignment."""
     return [
         employee
-        for employee in Employee.query.order_by(Employee.full_name).all()
+        for employee in _active_account_employees()
         if capacity_map.get(employee.id, {}).get("is_available")
     ]
 
@@ -261,7 +272,7 @@ def create_project():
 
     # Show the full workforce for manager visibility, but only eligible employees
     # can be selected for a new project assignment.
-    employees = Employee.query.order_by(Employee.full_name).all()
+    employees = _active_account_employees()
     # Keep assignable employees first. Unavailable employees and employees at
     # capacity remain visible for workforce planning, but are grouped below.
     employees.sort(
@@ -378,10 +389,20 @@ def create_project():
 def edit_project(project_id):
     project = Project.query.get_or_404(project_id)
     _require_project_manager(project)
-    employees = Employee.query.order_by(Employee.full_name).all()
+    selected_member_ids = _selected_member_ids(project_id)
+    active_employees = _active_account_employees()
+    active_account_employee_ids = {employee.id for employee in active_employees}
+    historical_members = (
+        Employee.query
+        .filter(Employee.id.in_(selected_member_ids - active_account_employee_ids))
+        .order_by(Employee.full_name)
+        .all()
+        if selected_member_ids - active_account_employee_ids
+        else []
+    )
+    employees = active_employees + historical_members
     skills = Skill.query.order_by(Skill.name).all()
     valid_skill_ids = {skill.id for skill in skills}
-    selected_member_ids = _selected_member_ids(project_id)
     project_requirements = _saved_project_requirements(project)
 
     if request.method == "POST":
@@ -391,6 +412,14 @@ def edit_project(project_id):
         posted_member_ids = {
             int(emp_id) for emp_id in request.form.getlist("members") if emp_id.isdigit()
         }
+        # Existing disabled-account members may remain attached for history, but
+        # only active accounts may be newly added to a project.
+        allowed_member_ids = active_account_employee_ids | selected_member_ids
+        invalid_member_ids = posted_member_ids - allowed_member_ids
+        if invalid_member_ids:
+            flash("Only team members with active login accounts can be added to a project.", "danger")
+            posted_member_ids &= allowed_member_ids
+
         project_requirements, requirement_error = _parse_project_requirements(
             valid_skill_ids
         )
@@ -402,6 +431,7 @@ def edit_project(project_id):
                 project_requirements=project_requirements,
                 selected_member_ids=posted_member_ids,
                 project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
+                active_account_employee_ids=active_account_employee_ids,
             )
 
         if not name:
@@ -412,6 +442,7 @@ def edit_project(project_id):
                 project_requirements=project_requirements,
                 selected_member_ids=posted_member_ids,
                 project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
+                active_account_employee_ids=active_account_employee_ids,
             )
         if status not in PROJECT_STATUSES:
             flash("Invalid project status.", "danger")
@@ -421,6 +452,7 @@ def edit_project(project_id):
                 project_requirements=project_requirements,
                 selected_member_ids=posted_member_ids,
                 project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
+                active_account_employee_ids=active_account_employee_ids,
             )
         if priority not in PROJECT_PRIORITIES:
             flash("Invalid project priority.", "danger")
@@ -430,6 +462,7 @@ def edit_project(project_id):
                 project_requirements=project_requirements,
                 selected_member_ids=posted_member_ids,
                 project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
+                active_account_employee_ids=active_account_employee_ids,
             )
 
         # Do not remove a member who still owns tasks in this project.
@@ -453,6 +486,7 @@ def edit_project(project_id):
                 project_requirements=project_requirements,
                 selected_member_ids=posted_member_ids,
                 project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
+                active_account_employee_ids=active_account_employee_ids,
             )
 
         project.name = name
@@ -481,6 +515,7 @@ def edit_project(project_id):
         project_requirements=project_requirements,
         selected_member_ids=selected_member_ids,
         project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
+        active_account_employee_ids=active_account_employee_ids,
     )
 
 
@@ -510,6 +545,14 @@ def detail(project_id):
         .filter(ProjectMember.project_id == project_id)
         .all()
     )
+    assignable_members = (
+        db.session.query(Employee)
+        .join(ProjectMember, ProjectMember.employee_id == Employee.id)
+        .join(User, User.id == Employee.user_id)
+        .filter(ProjectMember.project_id == project_id, User.is_active.is_(True))
+        .order_by(Employee.full_name)
+        .all()
+    )
     milestones = Milestone.query.filter_by(project_id=project_id).order_by(Milestone.due_date).all()
     skills = Skill.query.order_by(Skill.name).all()
     project_requirements = sorted(
@@ -524,7 +567,7 @@ def detail(project_id):
     return render_template(
         "projects/detail.html",
         project=project, tasks=tasks, members=members,
-        milestones=milestones, skills=skills, employees=members,
+        milestones=milestones, skills=skills, employees=assignable_members,
         project_requirements=project_requirements,
         progress=progress, statuses=TASK_STATUSES,
         can_manage_project=can_manage_project,
@@ -542,11 +585,19 @@ def create_task(project_id):
         return redirect(url_for("projects.detail", project_id=project_id))
 
     assignee_id = int(request.form.get("assignee_id") or 0) or None
-    if assignee_id and not ProjectMember.query.filter_by(
-        project_id=project_id, employee_id=assignee_id
-    ).first():
-        flash("Tasks can only be assigned to members of this project.", "danger")
-        return redirect(url_for("projects.detail", project_id=project_id))
+    if assignee_id:
+        assignee = (
+            Employee.query
+            .join(User, User.id == Employee.user_id)
+            .filter(Employee.id == assignee_id, User.is_active.is_(True))
+            .first()
+        )
+        is_project_member = ProjectMember.query.filter_by(
+            project_id=project_id, employee_id=assignee_id
+        ).first()
+        if not assignee or not is_project_member:
+            flash("Tasks can only be assigned to active-account members of this project.", "danger")
+            return redirect(url_for("projects.detail", project_id=project_id))
 
     status = request.form.get("status", "Backlog")
     if status not in TASK_STATUSES:

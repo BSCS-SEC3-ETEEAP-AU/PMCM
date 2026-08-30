@@ -63,7 +63,7 @@ python3.11 run.py
 | `admin` | Administrator |
 | `mgr_gueco` | Manager |
 | `mgr_buban` | Manager |
-| `emp_liza` | Employee (Data Analyst) |
+| `emp_maria` / `emp_john` / `emp_anna` / `emp_paolo` / `emp_liza` / `emp_mark` | Employees |
 
 ---
 

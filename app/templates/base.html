@@ -13,68 +13,71 @@
 <body class="{% if show_shell %}with-shell{% else %}without-shell{% endif %}">
   {% if show_shell %}
   <div class="app-shell">
-    <aside class="sidebar">
+    <aside class="sidebar" id="appSidebar">
       <div class="side-brand">
         <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="SPM&ECD" class="brand-logo-sm">
-        <span>SPM&amp;ECD</span>
+        <span class="side-brand-label">SPM&amp;ECD</span>
+        <button class="sidebar-pin" id="sidebarPin" type="button" aria-label="Keep sidebar expanded" aria-expanded="false" title="Keep sidebar expanded">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+        </button>
       </div>
 
       <nav class="side-nav" aria-label="Primary navigation">
         <a class="{% if request.endpoint == 'main.dashboard' %}active{% endif %}"
-          href="{{ url_for('main.dashboard') }}">
-          <span class="nav-ico">⌂</span>
-          <span>Dashboard</span>
+          href="{{ url_for('main.dashboard') }}" title="Dashboard">
+          <span class="nav-ico nav-ico-dashboard" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.5l8.5 7v9a1.5 1.5 0 0 1-1.5 1.5h-5v-6h-4v6H5a1.5 1.5 0 0 1-1.5-1.5z"></path></svg></span>
+          <span class="nav-label">Dashboard</span>
         </a>
         <a class="{% if request.endpoint and request.endpoint.startswith('projects.') %}active{% endif %}"
-          href="{{ url_for('projects.list_projects') }}">
-          <span class="nav-ico">□</span>
-          <span>Projects</span>
+          href="{{ url_for('projects.list_projects') }}" title="Projects">
+          <span class="nav-ico nav-ico-projects" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 7V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V7"></path><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M3 12h18M10 12v2h4v-2"></path></svg></span>
+          <span class="nav-label">Projects</span>
         </a>
         {% if current_user.role == 'admin' %}
         <a class="{% if request.endpoint == 'competency.list_employees' %}active{% endif %}"
-          href="{{ url_for('competency.list_employees') }}">
-          <span class="nav-ico">◌</span>
-          <span>Team</span>
+          href="{{ url_for('competency.list_employees') }}" title="Team">
+          <span class="nav-ico nav-ico-team" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h2a4.5 4.5 0 0 1 4.5 4.5V20M14.5 15a4 4 0 0 1 6 3.5V20"></path></svg></span>
+          <span class="nav-label">Team</span>
         </a>
         <a class="{% if request.endpoint and request.endpoint.startswith('competency.') and request.endpoint != 'competency.list_employees' %}active{% endif %}"
-          href="{{ url_for('competency.list_skills') }}">
-          <span class="nav-ico">◎</span>
-          <span>Competencies</span>
+          href="{{ url_for('competency.list_skills') }}" title="Competencies">
+          <span class="nav-ico nav-ico-competencies" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="4"></circle><path d="m15 9 5-5M16 4h4v4M12 12l4-4"></path></svg></span>
+          <span class="nav-label">Competencies</span>
         </a>
         {% elif current_user.role == 'manager' %}
         <a class="{% if request.endpoint == 'competency.list_employees' %}active{% endif %}"
-          href="{{ url_for('competency.list_employees') }}">
-          <span class="nav-ico">◌</span>
-          <span>Team</span>
+          href="{{ url_for('competency.list_employees') }}" title="Team">
+          <span class="nav-ico nav-ico-team" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h2a4.5 4.5 0 0 1 4.5 4.5V20M14.5 15a4 4 0 0 1 6 3.5V20"></path></svg></span>
+          <span class="nav-label">Team</span>
         </a>
         <a class="{% if request.endpoint and request.endpoint.startswith('competency.') and request.endpoint != 'competency.list_employees' %}active{% endif %}"
-          href="{{ url_for('competency.overview') }}">
-          <span class="nav-ico">◎</span>
-          <span>Competencies</span>
+          href="{{ url_for('competency.overview') }}" title="Competencies">
+          <span class="nav-ico nav-ico-competencies" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="4"></circle><path d="m15 9 5-5M16 4h4v4M12 12l4-4"></path></svg></span>
+          <span class="nav-label">Competencies</span>
         </a>
         {% else %}
         <a class="{% if request.endpoint and request.endpoint.startswith('competency.') %}active{% endif %}"
-          href="{{ url_for('competency.my_profile') }}">
-          <span class="nav-ico">◎</span>
-          <span>My Competencies</span>
+          href="{{ url_for('competency.my_profile') }}" title="My Competencies">
+          <span class="nav-ico nav-ico-competencies" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="4"></circle><path d="m15 9 5-5M16 4h4v4M12 12l4-4"></path></svg></span>
+          <span class="nav-label">My Competencies</span>
         </a>
         {% endif %}
         <a class="{% if request.endpoint and request.endpoint.startswith('recommendation.') %}active{% endif %}"
-          href="{{ url_for('recommendation.my_recommendations') }}">
-          <span class="nav-ico">▤</span>
-          <span>Learning</span>
+          href="{{ url_for('recommendation.my_recommendations') }}" title="Learning">
+          <span class="nav-ico nav-ico-learning" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 9 9-5 9 5-9 5z"></path><path d="M7 12v4.5c2.8 2 7.2 2 10 0V12M21 9v6"></path></svg></span>
+          <span class="nav-label">Learning</span>
         </a>
         {% if current_user.role in ('admin', 'manager') %}
         <a class="{% if request.endpoint and request.endpoint.startswith('reports.') %}active{% endif %}"
-          href="{{ url_for('reports.index') }}">
-          <span class="nav-ico">◫</span>
-          <span>Reports</span>
+          href="{{ url_for('reports.index') }}" title="Reports">
+          <span class="nav-ico nav-ico-reports" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20V10h4v10M10 20V4h4v16M16 20v-7h4v7M3 20h18"></path></svg></span>
+          <span class="nav-label">Reports</span>
         </a>
         {% endif %}
         {% if current_user.role == 'admin' %}
-        <a class="{% if request.endpoint == 'auth.accounts' %}active{% endif %}" href="{{ url_for('auth.accounts') }}">
-          <span class="nav-ico">⚙</span>
-          <span>Settings</span>
+        <a class="{% if request.endpoint == 'auth.accounts' %}active{% endif %}" href="{{ url_for('auth.accounts') }}" title="Settings">
+          <span class="nav-ico nav-ico-settings" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1z"></path></svg></span>
+          <span class="nav-label">Settings</span>
         </a>
         {% endif %}
       </nav>
@@ -90,8 +93,6 @@
 
     <div class="app-main">
       <header class="appbar">
-        <button class="menu-toggle" type="button" aria-label="Open navigation">☰</button>
-
         <div class="appbar-right">
           <details class="notif-menu" data-user-id="{{ current_user.id }}" data-notification-signature="{{ shell_notification_signature }}">
             <summary class="notif-btn" aria-label="Notifications" title="Notifications">
@@ -201,6 +202,33 @@
 
   {% block scripts %}{% endblock %}
   {% if show_shell and current_user.is_authenticated %}
+  <script>
+    (() => {
+      const shell = document.querySelector(".app-shell");
+      const sidebar = document.getElementById("appSidebar");
+      const pin = document.getElementById("sidebarPin");
+      if (!shell || !sidebar || !pin) return;
+
+      const key = "pmcm.sidebar.pinned";
+      const setPinned = (pinned) => {
+        shell.classList.toggle("sidebar-pinned", pinned);
+        sidebar.classList.toggle("is-pinned", pinned);
+        pin.setAttribute("aria-expanded", String(pinned));
+        pin.setAttribute("aria-label", pinned ? "Collapse sidebar" : "Keep sidebar expanded");
+        pin.title = pinned ? "Collapse sidebar" : "Keep sidebar expanded";
+      };
+
+      let pinned = false;
+      try { pinned = window.localStorage.getItem(key) === "true"; } catch (error) {}
+      setPinned(pinned);
+
+      pin.addEventListener("click", () => {
+        pinned = !sidebar.classList.contains("is-pinned");
+        setPinned(pinned);
+        try { window.localStorage.setItem(key, String(pinned)); } catch (error) {}
+      });
+    })();
+  </script>
   <script>
     (() => {
       const menu = document.querySelector(".notif-menu[data-notification-signature]");
