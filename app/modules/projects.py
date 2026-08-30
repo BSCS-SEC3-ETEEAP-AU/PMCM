@@ -37,6 +37,47 @@ def _selected_member_ids(project_id):
     }
 
 
+def _employee_capacity_map():
+    """Return active project workload and remaining capacity for each employee."""
+    active_counts = dict(
+        db.session.query(ProjectMember.employee_id, db.func.count(ProjectMember.id))
+        .join(Project, Project.id == ProjectMember.project_id)
+        .filter(Project.status == "Active")
+        .group_by(ProjectMember.employee_id)
+        .all()
+    )
+
+    capacity_map = {}
+    for employee in Employee.query.order_by(Employee.full_name).all():
+        active_projects = active_counts.get(employee.id, 0)
+        stored_capacity = max(0, employee.project_capacity or 0)
+        # Existing demo data may predate capacity controls. Never present a
+        # contradictory workload such as 4/3; current assignments establish
+        # the minimum effective capacity shown to the manager.
+        capacity = max(active_projects, stored_capacity)
+        availability_status = employee.availability_status or "Available"
+        at_capacity = active_projects >= capacity
+        is_available = availability_status == "Available" and not at_capacity
+        capacity_map[employee.id] = {
+            "active_projects": active_projects,
+            "capacity": capacity,
+            "remaining": max(0, capacity - active_projects),
+            "availability_status": availability_status,
+            "at_capacity": at_capacity,
+            "is_available": is_available,
+        }
+    return capacity_map
+
+
+def _available_employees(capacity_map):
+    """Employees eligible to accept a new project assignment."""
+    return [
+        employee
+        for employee in Employee.query.order_by(Employee.full_name).all()
+        if capacity_map.get(employee.id, {}).get("is_available")
+    ]
+
+
 @projects_bp.route("/")
 @login_required
 def list_projects():
@@ -79,7 +120,23 @@ def list_projects():
 @projects_bp.route("/create", methods=["GET", "POST"])
 @manager_required
 def create_project():
+    capacity_map = _employee_capacity_map()
+    # Show the full workforce for manager visibility, but only eligible employees
+    # can be selected for a new project assignment.
     employees = Employee.query.order_by(Employee.full_name).all()
+    # Keep assignable employees first. Unavailable employees and employees at
+    # capacity remain visible for workforce planning, but are grouped below.
+    employees.sort(
+        key=lambda employee: (
+            not capacity_map.get(employee.id, {}).get("is_available", False),
+            employee.full_name.lower(),
+        )
+    )
+    available_employee_ids = {
+        employee.id
+        for employee in employees
+        if capacity_map.get(employee.id, {}).get("is_available")
+    }
     selected_member_ids = set()
     if request.method == "POST":
         name = request.form.get("name", "").strip()
@@ -87,6 +144,22 @@ def create_project():
         selected_member_ids = {
             int(emp_id) for emp_id in request.form.getlist("members") if emp_id.isdigit()
         }
+        invalid_member_ids = selected_member_ids - available_employee_ids
+        if invalid_member_ids:
+            flash(
+                "One or more selected employees are unavailable or already at project capacity. "
+                "Please review the team selection.",
+                "danger",
+            )
+            selected_member_ids &= available_employee_ids
+            return render_template(
+                "projects/form.html",
+                employees=employees,
+                project=None,
+                selected_member_ids=selected_member_ids,
+                project_statuses=PROJECT_STATUSES,
+                employee_capacity=capacity_map,
+            )
         if not name:
             flash("Project name is required.", "danger")
             return render_template(
@@ -95,6 +168,7 @@ def create_project():
                 project=None,
                 selected_member_ids=selected_member_ids,
                 project_statuses=PROJECT_STATUSES,
+                employee_capacity=capacity_map,
             )
         if status not in PROJECT_STATUSES:
             flash("Invalid project status.", "danger")
@@ -104,6 +178,7 @@ def create_project():
                 project=None,
                 selected_member_ids=selected_member_ids,
                 project_statuses=PROJECT_STATUSES,
+                employee_capacity=capacity_map,
             )
         proj = Project(
             name=name,
@@ -126,6 +201,7 @@ def create_project():
         project=None,
         selected_member_ids=selected_member_ids,
         project_statuses=PROJECT_STATUSES,
+        employee_capacity=capacity_map,
     )
 
 

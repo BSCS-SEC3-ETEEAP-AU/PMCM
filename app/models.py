@@ -57,6 +57,8 @@ class Employee(db.Model):
     position = db.Column(db.String(80))
     team = db.Column(db.String(80))  # e.g. Software Engineering, Data Engineering, Data Analytics
     work_mode = db.Column(db.String(20), default="hybrid")
+    availability_status = db.Column(db.String(20), default="Available")  # Available | Unavailable
+    project_capacity = db.Column(db.Integer, default=3)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     user = db.relationship("User", backref="employee_profile", uselist=False)

@@ -27,15 +27,79 @@
       <input type="date" name="target_date" value="{{ project.target_date.isoformat() if editing and project.target_date else request.form.get('target_date','') }}">
     </label>
   </div>
-  <fieldset>
+  <fieldset class="project-team-fieldset">
     <legend>Team Members</legend>
+    {% if editing %}
     <p class="muted form-help">Only project members can be selected as task assignees.</p>
-    <div class="check-grid">
+    {% else %}
+    <p class="muted form-help">All employees are shown for workforce visibility. Only employees marked <strong>Available</strong> with remaining project capacity can be selected.</p>
+    {% endif %}
+    <div class="member-select-grid">
       {% for e in employees %}
-      <label class="chk">
-        <input type="checkbox" name="members" value="{{ e.id }}" {% if e.id in selected_member_ids %}checked{% endif %}>
-        {{ e.full_name }} <small>({{ e.team }})</small>
-      </label>
+      {% set capacity = employee_capacity.get(e.id) if employee_capacity is defined else none %}
+      {% set availability = capacity.availability_status if capacity else 'Available' %}
+      {% set at_capacity = capacity.at_capacity if capacity else false %}
+      {% set eligible = capacity.is_available if capacity else true %}
+      <div
+        class="member-select-card {% if not eligible %}is-disabled{% endif %} {% if availability == 'Unavailable' %}is-unavailable{% elif at_capacity %}is-at-capacity{% else %}is-available{% endif %}"
+        id="memberCard-{{ e.id }}"
+        data-employee-id="{{ e.id }}"
+        data-employee-name="{{ e.full_name|lower }}"
+        data-eligible="{{ '1' if eligible else '0' }}"
+      >
+        <div class="member-select-heading">
+          <label class="member-select-choice" for="member-{{ e.id }}">
+            <input
+              id="member-{{ e.id }}"
+              type="checkbox"
+              name="members"
+              value="{{ e.id }}"
+              {% if e.id in selected_member_ids %}checked{% endif %}
+              {% if not editing and not eligible %}disabled{% endif %}
+            >
+            <div class="member-select-identity">
+              <div class="member-name-line">
+                <strong>{{ e.full_name }}</strong>
+                <span class="member-position-title">{{ e.position or 'Position not set' }}</span>
+              </div>
+              <span class="member-team-name">{{ e.team or 'Department / team not assigned' }}</span>
+            </div>
+          </label>
+          {% if not editing and capacity %}
+          <button
+            class="member-capacity-edit"
+            type="button"
+            title="Edit availability and capacity"
+            aria-label="Edit availability and project capacity for {{ e.full_name }}"
+            data-update-url="{{ url_for('competency.update_employee_capacity', employee_id=e.id) }}"
+            data-employee-name="{{ e.full_name }}"
+            data-availability="{{ availability }}"
+            data-capacity="{{ capacity.capacity }}"
+            data-active-projects="{{ capacity.active_projects }}"
+          ><span aria-hidden="true">✎</span> Edit</button>
+          {% endif %}
+        </div>
+        {% if capacity %}
+        <div class="member-capacity-details">
+          <div class="member-capacity-row">
+            <span>Active Projects</span>
+            <strong class="capacity-active">{{ capacity.active_projects }}/{{ capacity.capacity }}</strong>
+          </div>
+          <div class="member-capacity-row">
+            <span>Slots Left</span>
+            <strong class="capacity-remaining">{{ capacity.remaining }}</strong>
+          </div>
+          <div class="member-capacity-row">
+            <span>Status</span>
+            <strong class="capacity-status {% if availability == 'Unavailable' %}status-unavailable{% elif at_capacity %}status-at-capacity{% else %}status-available{% endif %}">
+              {% if availability == 'Unavailable' %}Unavailable{% elif at_capacity %}At Capacity{% else %}Available{% endif %}
+            </strong>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      {% else %}
+      <div class="empty-state member-select-empty">No employee profiles are available.</div>
       {% endfor %}
     </div>
   </fieldset>
@@ -49,4 +113,163 @@
     {% endif %}
   </div>
 </form>
+
+{% if not editing %}
+<dialog class="capacity-editor" id="capacityEditor">
+  <div class="capacity-editor-head">
+    <div>
+      <span class="capacity-editor-kicker">Team capacity</span>
+      <h3 id="capacityEmployeeName">Employee</h3>
+    </div>
+    <button type="button" class="capacity-editor-close" id="capacityEditorClose" aria-label="Close">×</button>
+  </div>
+  <div class="capacity-editor-body">
+    <div class="capacity-editor-current">
+      <span>Current active projects</span>
+      <strong id="capacityActiveProjects">0</strong>
+      <small>Calculated automatically from active project assignments.</small>
+    </div>
+    <label>Availability
+      <select id="capacityAvailability">
+        <option value="Available">Available</option>
+        <option value="Unavailable">Unavailable</option>
+      </select>
+    </label>
+    <label>Maximum Active Projects
+      <input id="capacityLimit" type="number" min="0" max="20" step="1" required>
+      <small class="capacity-editor-hint">Set the employee's individual project capacity.</small>
+    </label>
+    <p class="capacity-editor-message" id="capacityEditorMessage" hidden></p>
+  </div>
+  <div class="capacity-editor-actions">
+    <button type="button" class="btn secondary" id="capacityEditorCancel">Cancel</button>
+    <button type="button" class="btn primary" id="capacityEditorSave">Save Capacity</button>
+  </div>
+</dialog>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+{% if not editing %}
+<script>
+(() => {
+  const dialog = document.getElementById('capacityEditor');
+  if (!dialog) return;
+
+  const nameEl = document.getElementById('capacityEmployeeName');
+  const activeEl = document.getElementById('capacityActiveProjects');
+  const availabilityEl = document.getElementById('capacityAvailability');
+  const capacityEl = document.getElementById('capacityLimit');
+  const messageEl = document.getElementById('capacityEditorMessage');
+  const saveBtn = document.getElementById('capacityEditorSave');
+  let activeButton = null;
+
+  const resortMemberCards = () => {
+    const grid = document.querySelector('.member-select-grid');
+    if (!grid) return;
+    const cards = Array.from(grid.querySelectorAll('.member-select-card'));
+    cards.sort((a, b) => {
+      const eligibleDiff = Number(b.dataset.eligible || 0) - Number(a.dataset.eligible || 0);
+      if (eligibleDiff !== 0) return eligibleDiff;
+      return (a.dataset.employeeName || '').localeCompare(b.dataset.employeeName || '');
+    });
+    cards.forEach(card => grid.appendChild(card));
+  };
+
+  const closeEditor = () => {
+    messageEl.hidden = true;
+    messageEl.textContent = '';
+    dialog.close();
+    activeButton = null;
+  };
+
+  document.querySelectorAll('.member-capacity-edit').forEach(button => {
+    button.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      activeButton = button;
+      nameEl.textContent = button.dataset.employeeName;
+      activeEl.textContent = button.dataset.activeProjects;
+      availabilityEl.value = button.dataset.availability;
+      capacityEl.value = button.dataset.capacity;
+      messageEl.hidden = true;
+      dialog.showModal();
+      capacityEl.focus();
+    });
+  });
+
+  document.getElementById('capacityEditorClose').addEventListener('click', closeEditor);
+  document.getElementById('capacityEditorCancel').addEventListener('click', closeEditor);
+  dialog.addEventListener('cancel', event => {
+    event.preventDefault();
+    closeEditor();
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    if (!activeButton) return;
+    const projectCapacity = Number(capacityEl.value);
+    if (!Number.isInteger(projectCapacity) || projectCapacity < 0 || projectCapacity > 20) {
+      messageEl.textContent = 'Capacity must be a whole number between 0 and 20.';
+      messageEl.hidden = false;
+      return;
+    }
+    const activeProjects = Number(activeEl.textContent || 0);
+    if (projectCapacity < activeProjects) {
+      messageEl.textContent = `Capacity cannot be lower than the employee's ${activeProjects} current active project(s).`;
+      messageEl.hidden = false;
+      return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    messageEl.hidden = true;
+    try {
+      const response = await fetch(activeButton.dataset.updateUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+          availability_status: availabilityEl.value,
+          project_capacity: projectCapacity
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.message || 'Unable to update capacity.');
+
+      const card = document.getElementById(`memberCard-${data.employee_id}`);
+      const checkbox = card.querySelector('input[name="members"]');
+      card.classList.toggle('is-disabled', !data.is_available);
+      card.classList.toggle('is-unavailable', data.availability_status === 'Unavailable');
+      card.classList.toggle('is-at-capacity', data.availability_status === 'Available' && data.at_capacity);
+      card.classList.toggle('is-available', data.is_available);
+      checkbox.disabled = !data.is_available;
+      if (!data.is_available) checkbox.checked = false;
+      card.dataset.eligible = data.is_available ? '1' : '0';
+
+      card.querySelector('.capacity-active').textContent = `${data.active_projects}/${data.project_capacity}`;
+      card.querySelector('.capacity-remaining').textContent = data.remaining;
+      const status = card.querySelector('.capacity-status');
+      status.textContent = data.display_status;
+      status.classList.remove('status-available', 'status-unavailable', 'status-at-capacity');
+      status.classList.add(data.display_status === 'Available' ? 'status-available' : data.display_status === 'Unavailable' ? 'status-unavailable' : 'status-at-capacity');
+
+      activeButton.dataset.availability = data.availability_status;
+      activeButton.dataset.capacity = data.project_capacity;
+      activeButton.dataset.activeProjects = data.active_projects;
+      resortMemberCards();
+      closeEditor();
+    } catch (error) {
+      messageEl.textContent = error.message;
+      messageEl.hidden = false;
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save Capacity';
+    }
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

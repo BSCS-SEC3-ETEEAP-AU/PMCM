@@ -4,11 +4,11 @@ Manages competency profiles, skills, certifications, competency assessments,
 and gap analysis (thesis Fig. 6). Employees complete assessments; the system
 computes current vs required gaps that feed the recommendation engine.
 """
-from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
+from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, jsonify
 from flask_login import login_required, current_user
 from datetime import date
 from ..models import (
-    db, Employee, Skill, Certification, CompetencyAssessment, User,
+    db, Employee, Skill, Certification, CompetencyAssessment, User, Project, ProjectMember,
 )
 from ..decorators import manager_required, admin_required
 from ..competency_rules import active_project_requirements
@@ -140,6 +140,71 @@ def list_employees():
 
     employees = Employee.query.order_by(Employee.full_name).all()
     return render_template("competency/employees.html", employees=employees)
+
+
+@competency_bp.route("/employees/<int:employee_id>/capacity", methods=["POST"])
+@manager_required
+def update_employee_capacity(employee_id):
+    """Update workforce availability/capacity from the project team selector."""
+    employee = Employee.query.get_or_404(employee_id)
+    payload = request.get_json(silent=True) or {}
+    availability_status = str(payload.get("availability_status", "")).strip().title()
+
+    if availability_status not in ("Available", "Unavailable"):
+        return jsonify({"ok": False, "message": "Availability must be Available or Unavailable."}), 400
+
+    try:
+        project_capacity = int(payload.get("project_capacity"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "message": "Project capacity must be a whole number."}), 400
+
+    if project_capacity < 0 or project_capacity > 20:
+        return jsonify({"ok": False, "message": "Project capacity must be between 0 and 20."}), 400
+
+    active_projects = (
+        db.session.query(db.func.count(ProjectMember.id))
+        .join(Project, Project.id == ProjectMember.project_id)
+        .filter(
+            ProjectMember.employee_id == employee.id,
+            Project.status == "Active",
+        )
+        .scalar()
+        or 0
+    )
+
+    if project_capacity < active_projects:
+        return jsonify({
+            "ok": False,
+            "message": (
+                f"Capacity cannot be lower than the employee's {active_projects} "
+                "current active project(s)."
+            ),
+        }), 400
+
+    employee.availability_status = availability_status
+    employee.project_capacity = project_capacity
+    db.session.commit()
+
+    at_capacity = active_projects >= project_capacity
+    is_available = availability_status == "Available" and not at_capacity
+    if availability_status == "Unavailable":
+        display_status = "Unavailable"
+    elif at_capacity:
+        display_status = "At Capacity"
+    else:
+        display_status = "Available"
+
+    return jsonify({
+        "ok": True,
+        "employee_id": employee.id,
+        "availability_status": availability_status,
+        "project_capacity": project_capacity,
+        "active_projects": active_projects,
+        "remaining": max(0, project_capacity - active_projects),
+        "at_capacity": at_capacity,
+        "is_available": is_available,
+        "display_status": display_status,
+    })
 
 
 @competency_bp.route("/employees/<int:employee_id>")
