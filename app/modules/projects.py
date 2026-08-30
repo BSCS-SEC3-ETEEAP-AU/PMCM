@@ -4,6 +4,8 @@ Supports project creation, task assignment, workflow coordination,
 milestone management, and project progress monitoring (thesis Fig. 5).
 Manager/Admin create projects & tasks; Employees update their task status.
 """
+from datetime import date
+
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
 from ..models import (
@@ -15,7 +17,9 @@ from ..decorators import manager_required
 projects_bp = Blueprint("projects", __name__, url_prefix="/projects")
 
 TASK_STATUSES = ["Backlog", "To Do", "In Progress", "In Review", "Done"]
+TASK_PRIORITIES = ["Low", "Medium", "High"]
 PROJECT_STATUSES = ["Active", "On Hold", "Completed"]
+PROJECT_PRIORITIES = ["Low", "Medium", "High"]
 
 
 def _can_manage_project(project):
@@ -221,6 +225,15 @@ def list_projects():
             "team_size": ProjectMember.query.filter_by(project_id=project.id).count(),
         })
 
+    deadline_rank = {"overdue": 0, "due-today": 1, "due-soon": 2, "on-track": 3, "no-deadline": 4, "completed": 5}
+    priority_rank = {"High": 0, "Medium": 1, "Low": 2}
+    project_rows.sort(key=lambda row: (
+        deadline_rank.get(row["project"].deadline_state, 4),
+        priority_rank.get(row["project"].priority or "Medium", 1),
+        row["project"].target_date or date.max,
+        row["project"].name.lower(),
+    ))
+
     total = len(project_rows)
     project_summary = {
         "total": total,
@@ -267,6 +280,7 @@ def create_project():
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         status = request.form.get("status", "Active")
+        priority = request.form.get("priority", "Medium")
         selected_member_ids = {
             int(emp_id) for emp_id in request.form.getlist("members") if emp_id.isdigit()
         }
@@ -280,7 +294,7 @@ def create_project():
                 employees=employees, skills=skills, project=None,
                 project_requirements=project_requirements,
                 selected_member_ids=selected_member_ids,
-                project_statuses=PROJECT_STATUSES, employee_capacity=capacity_map,
+                project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES, employee_capacity=capacity_map,
                 employee_proficiencies=employee_proficiencies,
             )
 
@@ -297,7 +311,7 @@ def create_project():
                 employees=employees, skills=skills, project=None,
                 project_requirements=project_requirements,
                 selected_member_ids=selected_member_ids,
-                project_statuses=PROJECT_STATUSES, employee_capacity=capacity_map,
+                project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES, employee_capacity=capacity_map,
                 employee_proficiencies=employee_proficiencies,
             )
         if not name:
@@ -307,7 +321,7 @@ def create_project():
                 employees=employees, skills=skills, project=None,
                 project_requirements=project_requirements,
                 selected_member_ids=selected_member_ids,
-                project_statuses=PROJECT_STATUSES, employee_capacity=capacity_map,
+                project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES, employee_capacity=capacity_map,
                 employee_proficiencies=employee_proficiencies,
             )
         if status not in PROJECT_STATUSES:
@@ -317,7 +331,17 @@ def create_project():
                 employees=employees, skills=skills, project=None,
                 project_requirements=project_requirements,
                 selected_member_ids=selected_member_ids,
-                project_statuses=PROJECT_STATUSES, employee_capacity=capacity_map,
+                project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES, employee_capacity=capacity_map,
+                employee_proficiencies=employee_proficiencies,
+            )
+        if priority not in PROJECT_PRIORITIES:
+            flash("Invalid project priority.", "danger")
+            return render_template(
+                "projects/form.html",
+                employees=employees, skills=skills, project=None,
+                project_requirements=project_requirements,
+                selected_member_ids=selected_member_ids,
+                project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES, employee_capacity=capacity_map,
                 employee_proficiencies=employee_proficiencies,
             )
 
@@ -326,6 +350,7 @@ def create_project():
             description=request.form.get("description", ""),
             manager_id=current_user.id,
             status=status,
+            priority=priority,
             start_date=_date(request.form.get("start_date")),
             target_date=_date(request.form.get("target_date")),
         )
@@ -343,7 +368,7 @@ def create_project():
         employees=employees, skills=skills, project=None,
         project_requirements=project_requirements,
         selected_member_ids=selected_member_ids,
-        project_statuses=PROJECT_STATUSES, employee_capacity=capacity_map,
+        project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES, employee_capacity=capacity_map,
         employee_proficiencies=employee_proficiencies,
     )
 
@@ -362,6 +387,7 @@ def edit_project(project_id):
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         status = request.form.get("status", project.status)
+        priority = request.form.get("priority", project.priority or "Medium")
         posted_member_ids = {
             int(emp_id) for emp_id in request.form.getlist("members") if emp_id.isdigit()
         }
@@ -375,7 +401,7 @@ def edit_project(project_id):
                 employees=employees, skills=skills, project=project,
                 project_requirements=project_requirements,
                 selected_member_ids=posted_member_ids,
-                project_statuses=PROJECT_STATUSES,
+                project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
             )
 
         if not name:
@@ -385,7 +411,7 @@ def edit_project(project_id):
                 employees=employees, skills=skills, project=project,
                 project_requirements=project_requirements,
                 selected_member_ids=posted_member_ids,
-                project_statuses=PROJECT_STATUSES,
+                project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
             )
         if status not in PROJECT_STATUSES:
             flash("Invalid project status.", "danger")
@@ -394,7 +420,16 @@ def edit_project(project_id):
                 employees=employees, skills=skills, project=project,
                 project_requirements=project_requirements,
                 selected_member_ids=posted_member_ids,
-                project_statuses=PROJECT_STATUSES,
+                project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
+            )
+        if priority not in PROJECT_PRIORITIES:
+            flash("Invalid project priority.", "danger")
+            return render_template(
+                "projects/form.html",
+                employees=employees, skills=skills, project=project,
+                project_requirements=project_requirements,
+                selected_member_ids=posted_member_ids,
+                project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
             )
 
         # Do not remove a member who still owns tasks in this project.
@@ -417,12 +452,13 @@ def edit_project(project_id):
                 employees=employees, skills=skills, project=project,
                 project_requirements=project_requirements,
                 selected_member_ids=posted_member_ids,
-                project_statuses=PROJECT_STATUSES,
+                project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
             )
 
         project.name = name
         project.description = request.form.get("description", "")
         project.status = status
+        project.priority = priority
         project.start_date = _date(request.form.get("start_date"))
         project.target_date = _date(request.form.get("target_date"))
 
@@ -444,7 +480,7 @@ def edit_project(project_id):
         employees=employees, skills=skills, project=project,
         project_requirements=project_requirements,
         selected_member_ids=selected_member_ids,
-        project_statuses=PROJECT_STATUSES,
+        project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
     )
 
 
@@ -516,6 +552,10 @@ def create_task(project_id):
     if status not in TASK_STATUSES:
         flash("Invalid task status.", "danger")
         return redirect(url_for("projects.detail", project_id=project_id))
+    priority = request.form.get("priority", "Medium")
+    if priority not in TASK_PRIORITIES:
+        flash("Invalid task priority.", "danger")
+        return redirect(url_for("projects.detail", project_id=project_id))
 
     task = Task(
         project_id=project_id,
@@ -523,7 +563,7 @@ def create_task(project_id):
         description=request.form.get("description", ""),
         assignee_id=assignee_id,
         status=status,
-        priority=request.form.get("priority", "Medium"),
+        priority=priority,
         required_skill_id=int(request.form.get("required_skill_id") or 0) or None,
         required_level=int(request.form.get("required_level") or 3),
         due_date=_date(request.form.get("due_date")),

@@ -51,6 +51,7 @@
           <th>Project Name</th>
           <th>Manager</th>
           <th>Status</th>
+          <th>Priority</th>
           <th>Progress</th>
           <th>Deadline</th>
           <th>Team</th>
@@ -60,28 +61,34 @@
       </thead>
       <tbody>
       {% for row in project_rows %}
-        <tr data-project-row data-search="{{ (row.project.name ~ ' ' ~ row.project.manager.full_name ~ ' ' ~ row.project.status)|lower }}">
+        <tr class="project-urgency-row urgency-{{ row.project.deadline_state }} priority-row-{{ (row.project.priority or 'Medium')|lower }}" data-project-row data-search="{{ (row.project.name ~ ' ' ~ row.project.manager.full_name ~ ' ' ~ row.project.status ~ ' ' ~ (row.project.priority or 'Medium') ~ ' ' ~ row.project.deadline_label)|lower }}">
           <td>
             <a class="module-primary-link" href="{{ url_for('projects.detail', project_id=row.project.id) }}">{{ row.project.name }}</a>
             {% if row.project.description %}<small class="module-cell-sub">{{ row.project.description[:68] }}{% if row.project.description|length > 68 %}…{% endif %}</small>{% endif %}
           </td>
           <td>{{ row.project.manager.full_name }}</td>
           <td><span class="status-pill status-{{ row.project.status|lower|replace(' ','-') }}">{{ row.project.status }}</span></td>
+          <td><span class="priority-pill priority-{{ (row.project.priority or 'Medium')|lower }}"><i></i>{{ row.project.priority or 'Medium' }}</span></td>
           <td>
             <div class="module-progress-cell">
               <span class="module-progress-track"><span style="width: {{ row.progress }}%"></span></span>
               <span>{{ row.progress }}%</span>
             </div>
           </td>
-          <td>{{ row.project.target_date.strftime('%b %d, %Y') if row.project.target_date else '—' }}</td>
+          <td>
+            <div class="deadline-cell">
+              <span>{{ row.project.target_date.strftime('%b %d, %Y') if row.project.target_date else '—' }}</span>
+              {% if row.project.target_date and row.project.status != 'Completed' %}<span class="deadline-badge deadline-{{ row.project.deadline_state }}">{{ row.project.deadline_label }}</span>{% endif %}
+            </div>
+          </td>
           <td>{{ row.team_size }}</td>
           <td>{{ row.total_tasks }}</td>
           <td class="module-action-cell"><a class="module-icon-link" href="{{ url_for('projects.detail', project_id=row.project.id) }}" title="View project" aria-label="View {{ row.project.name }}">→</a></td>
         </tr>
       {% else %}
-        <tr><td colspan="8"><div class="empty-state">No projects assigned to you yet.</div></td></tr>
+        <tr><td colspan="9"><div class="empty-state">No projects assigned to you yet.</div></td></tr>
       {% endfor %}
-        <tr id="projectNoResults" hidden><td colspan="8"><div class="empty-state">No projects match your search.</div></td></tr>
+        <tr id="projectNoResults" hidden><td colspan="9"><div class="empty-state">No projects match your search.</div></td></tr>
       </tbody>
     </table>
   </div>

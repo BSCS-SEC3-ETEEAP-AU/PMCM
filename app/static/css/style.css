@@ -4268,3 +4268,111 @@ a.module-kpi-card:hover {
     flex-direction: column;
   }
 }
+
+
+/* Project and task urgency indicators */
+.field-hint {
+  display: block;
+  margin-top: 5px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.priority-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.priority-pill i {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.priority-high { background: #fee2e2; color: #b91c1c; }
+.priority-medium { background: #fef3c7; color: #a16207; }
+.priority-low { background: #dcfce7; color: #15803d; }
+
+.deadline-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.deadline-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.deadline-overdue { background: #fee2e2; color: #b91c1c; }
+.deadline-due-today { background: #ffedd5; color: #c2410c; }
+.deadline-due-soon { background: #fef3c7; color: #a16207; }
+.deadline-on-track { background: #e8f7f2; color: #0f766e; }
+.deadline-completed { background: #dcfce7; color: #15803d; }
+.deadline-no-deadline { background: #f1f5f9; color: #64748b; }
+
+.project-list-table .project-urgency-row.urgency-overdue td:first-child {
+  box-shadow: inset 4px 0 0 #dc2626;
+}
+
+.project-list-table .project-urgency-row.urgency-due-today td:first-child {
+  box-shadow: inset 4px 0 0 #f97316;
+}
+
+.project-list-table .project-urgency-row.urgency-due-soon td:first-child {
+  box-shadow: inset 4px 0 0 #f59e0b;
+}
+
+.project-deadline-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ticket.task-priority-high {
+  border-left: 4px solid #ef4444;
+}
+
+.ticket.task-priority-medium {
+  border-left: 4px solid #f59e0b;
+}
+
+.ticket.task-priority-low {
+  border-left: 4px solid #22c55e;
+}
+
+.ticket.task-deadline-overdue {
+  border-color: #fca5a5;
+  background: #fff7f7;
+}
+
+.ticket.task-deadline-due-today {
+  border-color: #fdba74;
+  background: #fffaf5;
+}
+
+.ticket-due-overdue { color: #b91c1c; }
+.ticket-due-due-today { color: #c2410c; }
+.ticket-due-due-soon { color: #a16207; }
+
+@media (max-width: 620px) {
+  .project-detail-actions .priority-pill,
+  .project-detail-actions .status-pill {
+    width: auto;
+  }
+}

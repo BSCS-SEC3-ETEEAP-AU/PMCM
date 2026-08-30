@@ -117,11 +117,40 @@ class Project(db.Model):
     description = db.Column(db.Text)
     manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     status = db.Column(db.String(20), default="Active")  # Active | Completed | On Hold
+    priority = db.Column(db.String(20), default="Medium")  # Low | Medium | High
     start_date = db.Column(db.Date)
     target_date = db.Column(db.Date)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     manager = db.relationship("User", backref="managed_projects")
+
+    @property
+    def deadline_state(self):
+        """Return a visual deadline state for urgency indicators."""
+        if self.status == "Completed":
+            return "completed"
+        if not self.target_date:
+            return "no-deadline"
+        days_remaining = (self.target_date - date.today()).days
+        if days_remaining < 0:
+            return "overdue"
+        if days_remaining == 0:
+            return "due-today"
+        if days_remaining <= 3:
+            return "due-soon"
+        return "on-track"
+
+    @property
+    def deadline_label(self):
+        labels = {
+            "completed": "Completed",
+            "no-deadline": "No deadline",
+            "overdue": "Overdue",
+            "due-today": "Due Today",
+            "due-soon": "Due Soon",
+            "on-track": "On Track",
+        }
+        return labels[self.deadline_state]
 
 
 class ProjectMember(db.Model):
@@ -177,6 +206,34 @@ class Task(db.Model):
     project = db.relationship("Project", backref="tasks")
     assignee = db.relationship("Employee", backref="assigned_tasks")
     required_skill = db.relationship("Skill", backref="required_by_tasks")
+
+    @property
+    def deadline_state(self):
+        """Return task deadline state for urgency highlighting."""
+        if self.status == "Done":
+            return "completed"
+        if not self.due_date:
+            return "no-deadline"
+        days_remaining = (self.due_date - date.today()).days
+        if days_remaining < 0:
+            return "overdue"
+        if days_remaining == 0:
+            return "due-today"
+        if days_remaining <= 3:
+            return "due-soon"
+        return "on-track"
+
+    @property
+    def deadline_label(self):
+        labels = {
+            "completed": "Completed",
+            "no-deadline": "No deadline",
+            "overdue": "Overdue",
+            "due-today": "Due Today",
+            "due-soon": "Due Soon",
+            "on-track": "On Track",
+        }
+        return labels[self.deadline_state]
 
 
 class Milestone(db.Model):

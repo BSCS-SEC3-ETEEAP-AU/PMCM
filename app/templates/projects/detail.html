@@ -10,13 +10,14 @@
   </div>
   <div class="project-detail-actions">
     {% if can_manage_project %}<a class="btn secondary" href="{{ url_for('projects.edit_project', project_id=project.id) }}">Edit Project</a>{% endif %}
+    <span class="priority-pill priority-{{ (project.priority or 'Medium')|lower }}"><i></i>{{ project.priority or 'Medium' }} Priority</span>
     <span class="status-pill status-{{ project.status|lower|replace(' ','') }}">{{ project.status }}</span>
   </div>
 </div>
 <div class="project-meta-row">
   <span><strong>Manager:</strong> {{ project.manager.full_name }}</span>
   <span><strong>Start:</strong> {{ project.start_date.strftime('%b %d, %Y') if project.start_date else '—' }}</span>
-  <span><strong>Target / Deadline:</strong> {{ project.target_date.strftime('%b %d, %Y') if project.target_date else '—' }}</span>
+  <span class="project-deadline-meta"><strong>Target / Deadline:</strong> {{ project.target_date.strftime('%b %d, %Y') if project.target_date else '—' }}{% if project.target_date and project.status != 'Completed' %} <span class="deadline-badge deadline-{{ project.deadline_state }}">{{ project.deadline_label }}</span>{% endif %}</span>
   <span><strong>Progress:</strong> {{ progress }}%</span>
 </div>
 <div class="progress-bar"><span style="width:{{ progress }}%"></span></div>
@@ -51,13 +52,13 @@
       <div class="board-col">
         <div class="board-head">{{ st }} <small>({{ tasks|selectattr('status','equalto',st)|list|length }})</small></div>
         {% for t in tasks if t.status == st %}
-        <div class="ticket">
+        <div class="ticket task-priority-{{ t.priority|lower }} task-deadline-{{ t.deadline_state }}">
           <div class="t-title">{{ t.title }}</div>
           <div class="t-meta">
             <span class="prio prio-{{ t.priority|lower }}">{{ t.priority }}</span>
             {% if t.assignee %}<span>{{ t.assignee.full_name }}</span>{% endif %}
           </div>
-          {% if t.due_date %}<div class="ticket-due">Due {{ t.due_date.strftime('%b %d, %Y') }}</div>{% endif %}
+          {% if t.due_date %}<div class="ticket-due ticket-due-{{ t.deadline_state }}">Due {{ t.due_date.strftime('%b %d, %Y') }}{% if t.status != 'Done' %} · <strong>{{ t.deadline_label }}</strong>{% endif %}</div>{% endif %}
           {% if can_manage_project or (current_user.role == 'employee' and t.assignee and t.assignee.user_id == current_user.id) %}
           <form method="POST" action="{{ url_for('projects.update_task', task_id=t.id) }}">
             <select name="status" onchange="this.form.submit()">

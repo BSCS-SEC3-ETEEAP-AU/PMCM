@@ -54,11 +54,15 @@ def dashboard():
         else:
             active_projects_query = active_projects_query.filter(Project.id == -1)
 
-    active_projects = (
-        active_projects_query
-        .order_by(Project.target_date.asc(), Project.id.desc())
-        .all()
-    )
+    active_projects = active_projects_query.all()
+    deadline_rank = {"overdue": 0, "due-today": 1, "due-soon": 2, "on-track": 3, "no-deadline": 4, "completed": 5}
+    priority_rank = {"High": 0, "Medium": 1, "Low": 2}
+    active_projects.sort(key=lambda project: (
+        deadline_rank.get(project.deadline_state, 4),
+        priority_rank.get(project.priority or "Medium", 1),
+        project.target_date or date.max,
+        project.name.lower(),
+    ))
     active_project_ids = [project.id for project in active_projects]
 
     # ----- Top cards -----
@@ -155,6 +159,9 @@ def dashboard():
                 "name": project.name,
                 "manager": project.manager.full_name if project.manager else "—",
                 "status": project.status,
+                "priority": project.priority or "Medium",
+                "deadline_state": project.deadline_state,
+                "deadline_label": project.deadline_label,
                 "progress": project_progress_pct(project.id),
                 "target_date": project.target_date,
             }

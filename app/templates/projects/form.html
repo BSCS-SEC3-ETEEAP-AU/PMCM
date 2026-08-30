@@ -11,14 +11,25 @@
   <label>Description
     <textarea name="description" rows="3">{{ project.description if editing else request.form.get('description','') }}</textarea>
   </label>
-  <label>Status
-    {% set current_status = project.status if editing else request.form.get('status','Active') %}
-    <select name="status">
-      {% for status in project_statuses %}
-      <option value="{{ status }}" {% if current_status == status %}selected{% endif %}>{{ status }}</option>
-      {% endfor %}
-    </select>
-  </label>
+  <div class="row-2">
+    <label>Status
+      {% set current_status = project.status if editing else request.form.get('status','Active') %}
+      <select name="status">
+        {% for status in project_statuses %}
+        <option value="{{ status }}" {% if current_status == status %}selected{% endif %}>{{ status }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Project Priority / Urgency
+      {% set current_priority = (project.priority or 'Medium') if editing else request.form.get('priority','Medium') %}
+      <select name="priority">
+        {% for priority in project_priorities %}
+        <option value="{{ priority }}" {% if current_priority == priority %}selected{% endif %}>{{ priority }}</option>
+        {% endfor %}
+      </select>
+      <small class="field-hint">High priority projects receive stronger visual urgency indicators.</small>
+    </label>
+  </div>
   <div class="row-2">
     <label>Start Date
       <input type="date" name="start_date" value="{{ project.start_date.isoformat() if editing and project.start_date else request.form.get('start_date','') }}">
