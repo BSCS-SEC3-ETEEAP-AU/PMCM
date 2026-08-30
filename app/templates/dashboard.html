@@ -174,7 +174,7 @@
             <td><span class="priority-pill priority-{{ project.priority|lower }}"><i></i>{{ project.priority }}</span></td>
             <td>
               <div class="progress-cell">
-                <span class="mini-bar"><span style="width: {{ project.progress }}%"></span></span>
+                <span class="mini-bar"><span class="u-dynamic-width" style="--dynamic-width: {{ project.progress }}%"></span></span>
                 <span class="proj-pct">{{ project.progress }}%</span>
               </div>
             </td>

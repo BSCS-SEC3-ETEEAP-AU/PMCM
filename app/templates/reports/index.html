@@ -38,7 +38,7 @@
       {% for row in team_coverage %}
       <div class="coverage-row">
         <div class="coverage-label"><span>{{ row.team }}</span><strong>{{ row.coverage }}%</strong></div>
-        <div class="coverage-track"><span style="width: {{ row.coverage }}%"></span></div>
+        <div class="coverage-track"><span class="u-dynamic-width" style="--dynamic-width: {{ row.coverage }}%"></span></div>
         <small>{{ row.assessed }} active requirement{{ '' if row.assessed == 1 else 's' }} · {{ row.gaps }} open gap{{ '' if row.gaps == 1 else 's' }}</small>
       </div>
       {% else %}<div class="empty-state">No active project competency requirements are available.</div>{% endfor %}

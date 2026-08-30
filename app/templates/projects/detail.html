@@ -20,7 +20,7 @@
   <span class="project-deadline-meta"><strong>Target / Deadline:</strong> {{ project.target_date.strftime('%b %d, %Y') if project.target_date else '—' }}{% if project.target_date and project.status != 'Completed' %} <span class="deadline-badge deadline-{{ project.deadline_state }}">{{ project.deadline_label }}</span>{% endif %}</span>
   <span><strong>Progress:</strong> {{ progress }}%</span>
 </div>
-<div class="progress-bar"><span style="width:{{ progress }}%"></span></div>
+<div class="progress-bar"><span class="u-dynamic-width" style="--dynamic-width: {{ progress }}%"></span></div>
 
 <div class="card project-requirements-summary">
   <div class="project-requirements-summary-head">

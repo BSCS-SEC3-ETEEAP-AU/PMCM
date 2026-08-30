@@ -26,7 +26,7 @@
     <thead><tr><th>Team</th><th>Members</th><th>Projects Represented</th><th>Active Skill Requirements</th><th>Coverage</th><th>Open Gaps</th><th>Learning In Progress</th><th>Learning Completed</th></tr></thead>
     <tbody>{% for r in rows %}<tr>
       <td><strong>{{ r.team }}</strong></td><td>{{ r.members }}</td><td>{{ r.projects }}</td><td>{{ r.requirements }}</td>
-      <td><div class="report-progress-cell"><div class="coverage-track"><span style="width:{{ r.coverage }}%"></span></div><strong>{{ r.coverage }}%</strong></div></td>
+      <td><div class="report-progress-cell"><div class="coverage-track"><span class="u-dynamic-width" style="--dynamic-width: {{ r.coverage }}%"></span></div><strong>{{ r.coverage }}%</strong></div></td>
       <td>{{ r.gaps }}</td><td>{{ r.in_progress }}</td><td>{{ r.completed }}</td>
     </tr>{% else %}<tr><td colspan="8"><div class="empty-state">No workforce data match the selected filters.</div></td></tr>{% endfor %}</tbody>
   </table></div>

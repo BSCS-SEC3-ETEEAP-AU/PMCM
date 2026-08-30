@@ -34,7 +34,7 @@
           {% if row.ranking_eligible %}<span class="performance-rank">#{{ row.rank }}</span>{% else %}<span class="performance-sample-badge">Limited sample</span>{% endif %}
           <div><strong>{{ row.employee.full_name }}</strong><small>{{ row.employee.position or '—' }} · {{ row.employee.team or 'Unassigned' }}</small></div>
         </div>
-        <div class="performance-bar-track" title="Average completion time: {{ row.avg_label }}"><span style="width: {{ row.bar_pct }}%"></span></div>
+        <div class="performance-bar-track" title="Average completion time: {{ row.avg_label }}"><span class="u-dynamic-width" style="--dynamic-width: {{ row.bar_pct }}%"></span></div>
         <div class="performance-bar-value"><strong>{{ row.avg_label }}</strong><small>{{ row.completed }} completed{% if not row.ranking_eligible %} · not ranked{% endif %}</small></div>
       </div>
       {% else %}
@@ -50,7 +50,7 @@
       <div class="project-delivery-row">
         <div class="project-delivery-copy"><strong>{{ row.project.name }}</strong><small>{{ row.project.manager.full_name }} · Completed {{ row.project.completed_at.strftime('%b %d, %Y') if row.project.completed_at else '—' }}</small></div>
         {% if row.delivery_days is not none %}
-        <div class="project-delivery-track"><span style="width: {{ row.bar_pct }}%"></span></div>
+        <div class="project-delivery-track"><span class="u-dynamic-width" style="--dynamic-width: {{ row.bar_pct }}%"></span></div>
         <div class="project-delivery-value"><strong>{{ row.delivery_days }} days</strong><span class="report-status {% if row.delivery_status == 'On Time' %}report-status-completed{% elif row.delivery_status == 'Late' %}report-status-has-gap{% endif %}">{{ row.delivery_status }}</span></div>
         {% else %}
         <div class="report-muted">No start date recorded</div><div class="project-delivery-value">—</div>

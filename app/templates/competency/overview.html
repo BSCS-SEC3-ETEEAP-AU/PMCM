@@ -70,7 +70,7 @@
           <td>
             {% if row.coverage is not none %}
             <div class="coverage-cell">
-              <div class="mini-bar"><span style="width:{{ row.coverage }}%"></span></div>
+              <div class="mini-bar"><span class="u-dynamic-width" style="--dynamic-width: {{ row.coverage }}%"></span></div>
               <span>{{ row.coverage }}%</span>
             </div>
             {% else %}

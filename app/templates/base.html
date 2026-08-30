@@ -10,7 +10,7 @@
 
 {% set show_shell = current_user.is_authenticated and not (hide_chrome|default(false)) %}
 
-<body class="{% if show_shell %}with-shell{% else %}without-shell{% endif %}">
+<body class="{% if show_shell %}with-shell{% else %}without-shell{% endif %}{% if page_class|default('') %} {{ page_class }}{% endif %}">
   {% if show_shell %}
   <div class="app-shell">
     <aside class="sidebar" id="appSidebar">

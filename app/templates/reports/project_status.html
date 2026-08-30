@@ -33,7 +33,7 @@
     <tbody>{% for r in rows %}<tr>
       <td><strong>{{ r.project }}</strong></td><td>{{ r.manager }}</td><td><span class="status-pill status-{{ r.status|lower|replace(' ','') }}">{{ r.status }}</span></td>
       <td>{{ r.start_date.strftime('%b %d, %Y') if r.start_date else '—' }}</td><td>{{ r.target_date.strftime('%b %d, %Y') if r.target_date else '—' }}</td>
-      <td>{{ r.done }} / {{ r.total_tasks }}</td><td><div class="report-progress-cell"><div class="coverage-track"><span style="width:{{ r.progress }}%"></span></div><strong>{{ r.progress }}%</strong></div></td>
+      <td>{{ r.done }} / {{ r.total_tasks }}</td><td><div class="report-progress-cell"><div class="coverage-track"><span class="u-dynamic-width" style="--dynamic-width: {{ r.progress }}%"></span></div><strong>{{ r.progress }}%</strong></div></td>
       <td>{{ r.open_milestones }}</td><td>{{ r.next_deadline.strftime('%b %d, %Y') if r.next_deadline else '—' }}</td>
     </tr>{% else %}<tr><td colspan="9"><div class="empty-state">No projects match the selected filters.</div></td></tr>{% endfor %}</tbody>
   </table></div>

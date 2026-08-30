@@ -71,7 +71,7 @@
           <td><span class="priority-pill priority-{{ (row.project.priority or 'Medium')|lower }}"><i></i>{{ row.project.priority or 'Medium' }}</span></td>
           <td>
             <div class="module-progress-cell">
-              <span class="module-progress-track"><span style="width: {{ row.progress }}%"></span></span>
+              <span class="module-progress-track"><span class="u-dynamic-width" style="--dynamic-width: {{ row.progress }}%"></span></span>
               <span>{{ row.progress }}%</span>
             </div>
           </td>
