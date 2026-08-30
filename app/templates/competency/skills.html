@@ -4,7 +4,11 @@
 {% block page_subtitle %}{% if current_user.role == 'admin' %}Maintain the competency framework used across projects and assessments{% else %}Review the competency framework used across projects and assessments{% endif %}{% endblock %}
 
 {% block content %}
-<div class="module-toolbar competency-toolbar">
+{% set technical_count = skills|selectattr('category', 'equalto', 'Technical')|list|length %}
+{% set soft_count = skills|selectattr('category', 'equalto', 'Soft')|list|length %}
+{% set domain_count = skills|selectattr('category', 'equalto', 'Domain')|list|length %}
+
+<div class="module-toolbar competency-toolbar skills-page-toolbar">
   <div class="module-info-banner">
     <span>i</span>
     {% if current_user.role == 'admin' %}
@@ -20,45 +24,181 @@
   </div>
 </div>
 
-<section class="module-panel module-table-panel">
-  <div class="module-panel-head">
+<div class="module-kpi-row competency-kpi-row skills-summary-row">
+  <div class="module-kpi-card mk-teal">
+    <span class="module-kpi-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M8.5 6.5h7M8.5 11.5h7M8.5 16.5h4"/><rect x="4" y="3" width="16" height="18" rx="2"/></svg>
+    </span>
+    <div><span class="module-kpi-label">Total Skills</span><strong>{{ skills|length }}</strong><small>Competencies tracked</small></div>
+  </div>
+  <div class="module-kpi-card mk-blue">
+    <span class="module-kpi-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M9 7 5 12l4 5M15 7l4 5-4 5M13 5l-2 14"/></svg>
+    </span>
+    <div><span class="module-kpi-label">Technical</span><strong>{{ technical_count }}</strong><small>Technical competencies</small></div>
+  </div>
+  <div class="module-kpi-card mk-violet">
+    <span class="module-kpi-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M16 11a4 4 0 1 0-8 0M5 20a7 7 0 0 1 14 0"/><path d="M18.5 8.5 20 7m-1.5 6.5L20 15"/></svg>
+    </span>
+    <div><span class="module-kpi-label">Soft Skills</span><strong>{{ soft_count }}</strong><small>Behavioral competencies</small></div>
+  </div>
+  <div class="module-kpi-card mk-green">
+    <span class="module-kpi-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M4 19V8l8-4 8 4v11"/><path d="M8 19v-5h8v5M9 9h.01M12 9h.01M15 9h.01"/></svg>
+    </span>
+    <div><span class="module-kpi-label">Domain</span><strong>{{ domain_count }}</strong><small>Business/domain competencies</small></div>
+  </div>
+</div>
+
+<section class="module-panel module-table-panel skills-catalog-panel">
+  <div class="module-panel-head skills-catalog-head">
     <div>
       <h2>Competency Framework</h2>
-      <p>{{ skills|length }} skills currently tracked</p>
+      <p>Search, review and maintain the skills used across project and workforce planning.</p>
     </div>
+    {% if current_user.role == 'admin' %}
+    <button class="btn primary skills-add-trigger" type="button" id="openSkillDialog">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      Add Skill
+    </button>
+    {% endif %}
   </div>
+
+  <div class="skills-filter-bar">
+    <label class="module-search-wrap skills-search-wrap skills-search-wrap--plain">
+      <input class="module-search" id="skillSearch" type="search" placeholder="Search skills or descriptions..." autocomplete="off">
+    </label>
+    <label class="skills-category-filter">
+      <span>Category</span>
+      <select id="skillCategoryFilter">
+        <option value="">All Categories</option>
+        <option value="technical">Technical</option>
+        <option value="soft">Soft</option>
+        <option value="domain">Domain</option>
+        <option value="other">Other</option>
+      </select>
+    </label>
+    <button class="btn secondary skills-clear-filter" type="button" id="clearSkillFilters">Clear Filters</button>
+    <span class="skills-result-count" id="skillResultCount">Showing {{ skills|length }} of {{ skills|length }} skills</span>
+  </div>
+
   <div class="table-wrap">
     <table class="data-table skills-table">
       <thead><tr><th>Skill</th><th>Category</th><th>Description</th></tr></thead>
-      <tbody>
+      <tbody id="skillsTableBody">
       {% for s in skills %}
-        <tr>
-          <td><strong>{{ s.name }}</strong></td>
+        <tr class="skill-row" data-name="{{ s.name|lower }}" data-category="{{ (s.category or 'Other')|lower }}" data-description="{{ (s.description or '')|lower }}">
+          <td>
+            <div class="skill-name-cell">
+              <span class="skill-row-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 3 4 7v5c0 4.8 3.2 7.7 8 9 4.8-1.3 8-4.2 8-9V7l-8-4Z"/><path d="m9.5 12 1.7 1.7 3.6-3.7"/></svg>
+              </span>
+              <div><strong>{{ s.name }}</strong><small>Available for projects and assessments</small></div>
+            </div>
+          </td>
           <td><span class="category-badge category-{{ (s.category or 'other')|lower|replace(' ', '-') }}">{{ s.category or 'Other' }}</span></td>
-          <td>{{ s.description or '—' }}</td>
+          <td class="skill-description">{{ s.description or 'No description provided.' }}</td>
         </tr>
       {% else %}
         <tr><td colspan="3" class="muted">No skills have been added yet.</td></tr>
       {% endfor %}
+        <tr id="skillFilterEmpty" hidden><td colspan="3"><div class="skills-empty-state">No skills match the current search or category filter.</div></td></tr>
       </tbody>
     </table>
   </div>
 </section>
 
 {% if current_user.role == 'admin' %}
-<form class="form-card skills-add-card" method="POST" action="{{ url_for('competency.add_skill') }}">
-  <div class="module-panel-head skills-form-head">
-    <div>
-      <h2>Add Skill</h2>
-      <p>Add a competency that can be used in project requirements and employee assessments.</p>
+<dialog class="project-modal skills-add-modal" id="skillDialog">
+  <form class="project-modal-card" method="POST" action="{{ url_for('competency.add_skill') }}">
+    <div class="project-modal-head">
+      <div>
+        <span class="project-modal-kicker">Competency Framework</span>
+        <h3>Add New Skill</h3>
+      </div>
+      <button class="project-modal-close" type="button" id="closeSkillDialog" aria-label="Close">×</button>
     </div>
-  </div>
-  <label>Name <input type="text" name="name" required></label>
-  <label>Category
-    <select name="category"><option>Technical</option><option>Soft</option><option>Domain</option></select>
-  </label>
-  <label>Description <input type="text" name="description"></label>
-  <button class="btn primary" type="submit">Add Skill</button>
-</form>
+    <p class="project-modal-copy">Add a competency that can be selected for project requirements, employee assessments and learning recommendations.</p>
+    <div class="project-modal-grid">
+      <div class="project-modal-field full">
+        <label for="skillName">Skill Name</label>
+        <input id="skillName" type="text" name="name" placeholder="e.g. PostgreSQL" required>
+      </div>
+      <div class="project-modal-field">
+        <label for="skillCategory">Category</label>
+        <select id="skillCategory" name="category">
+          <option>Technical</option>
+          <option>Soft</option>
+          <option>Domain</option>
+        </select>
+      </div>
+      <div class="project-modal-field full">
+        <label for="skillDescription">Description</label>
+        <input id="skillDescription" type="text" name="description" placeholder="Short description of how this competency is used">
+      </div>
+    </div>
+    <div class="project-modal-actions">
+      <button class="btn secondary" type="button" id="cancelSkillDialog">Cancel</button>
+      <button class="btn primary" type="submit">Add Skill</button>
+    </div>
+  </form>
+</dialog>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const search = document.getElementById('skillSearch');
+  const category = document.getElementById('skillCategoryFilter');
+  const clear = document.getElementById('clearSkillFilters');
+  const rows = Array.from(document.querySelectorAll('.skill-row'));
+  const count = document.getElementById('skillResultCount');
+  const empty = document.getElementById('skillFilterEmpty');
+
+  const filterSkills = () => {
+    const query = (search?.value || '').trim().toLowerCase();
+    const selectedCategory = (category?.value || '').toLowerCase();
+    let visible = 0;
+
+    rows.forEach((row) => {
+      const haystack = `${row.dataset.name || ''} ${row.dataset.description || ''}`;
+      const matchesQuery = !query || haystack.includes(query);
+      const matchesCategory = !selectedCategory || row.dataset.category === selectedCategory;
+      const show = matchesQuery && matchesCategory;
+      row.hidden = !show;
+      if (show) visible += 1;
+    });
+
+    if (count) count.textContent = `Showing ${visible} of ${rows.length} skills`;
+    if (empty) empty.hidden = visible !== 0;
+  };
+
+  search?.addEventListener('input', filterSkills);
+  category?.addEventListener('change', filterSkills);
+  clear?.addEventListener('click', () => {
+    if (search) search.value = '';
+    if (category) category.value = '';
+    filterSkills();
+    search?.focus();
+  });
+
+  const dialog = document.getElementById('skillDialog');
+  const open = document.getElementById('openSkillDialog');
+  const close = document.getElementById('closeSkillDialog');
+  const cancel = document.getElementById('cancelSkillDialog');
+  const closeDialog = () => dialog?.close();
+
+  open?.addEventListener('click', () => {
+    dialog?.showModal();
+    window.setTimeout(() => document.getElementById('skillName')?.focus(), 0);
+  });
+  close?.addEventListener('click', closeDialog);
+  cancel?.addEventListener('click', closeDialog);
+  dialog?.addEventListener('click', (event) => {
+    if (event.target === dialog) closeDialog();
+  });
+})();
+</script>
 {% endblock %}

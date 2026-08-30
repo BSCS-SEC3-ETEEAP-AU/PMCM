@@ -6065,3 +6065,233 @@ a.module-kpi-card:hover {
   .gap-analysis-actions .btn { width: 100%; justify-content: center; }
   .gap-results-head { align-items: flex-start; }
 }
+
+/* ---------- Skills Catalog polish ---------- */
+.skills-page-toolbar {
+  margin-bottom: 14px;
+}
+
+.skills-summary-row {
+  margin-bottom: 14px;
+}
+
+.skills-summary-row .module-kpi-card {
+  min-height: 96px;
+}
+
+.skills-summary-row .module-kpi-icon svg {
+  fill: none;
+}
+
+.skills-catalog-panel {
+  overflow: hidden;
+}
+
+.skills-catalog-head {
+  align-items: center;
+}
+
+.skills-add-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.skills-add-trigger svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.skills-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(180px, 230px) auto auto;
+  align-items: end;
+  gap: 10px;
+  padding: 12px 14px;
+  border-top: 1px solid #eef2f7;
+  border-bottom: 1px solid #e8edf3;
+  background: #fbfcfe;
+}
+
+.skills-search-wrap {
+  width: 100%;
+}
+
+.skills-search-wrap--plain .module-search {
+  padding-left: 13px;
+}
+
+.skills-search-wrap--plain input[type="search"]::-webkit-search-decoration,
+.skills-search-wrap--plain input[type="search"]::-webkit-search-cancel-button,
+.skills-search-wrap--plain input[type="search"]::-webkit-search-results-button,
+.skills-search-wrap--plain input[type="search"]::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+}
+
+.skills-category-filter {
+  display: grid;
+  gap: 5px;
+}
+
+.skills-category-filter > span {
+  color: #475569;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.skills-category-filter select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #d7e0ea;
+  border-radius: 9px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 12px;
+}
+
+.skills-clear-filter {
+  min-height: 40px;
+}
+
+.skills-result-count {
+  align-self: center;
+  justify-self: end;
+  color: #64748b;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.skills-table {
+  min-width: 820px;
+  font-size: 13px;
+}
+
+.skills-table th {
+  padding: 11px 14px;
+  color: #475569;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .01em;
+  background: #f8fafc;
+}
+
+.skills-table td {
+  padding: 12px 14px;
+  vertical-align: middle;
+  color: #334155;
+}
+
+.skills-table tbody tr:hover:not([hidden]) {
+  background: #fbfefd;
+}
+
+.skill-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.skill-row-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  border-radius: 10px;
+  background: #e8f7f5;
+  color: #0f8f81;
+}
+
+.skill-row-icon svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.skill-name-cell > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.skill-name-cell strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.skill-name-cell small {
+  color: #64748b;
+  font-size: 9.5px;
+  font-weight: 500;
+}
+
+.skill-description {
+  color: #475569;
+  line-height: 1.45;
+}
+
+.skills-table .category-badge {
+  padding: 4px 9px;
+  font-size: 10px;
+}
+
+.skills-empty-state {
+  padding: 26px 12px;
+  text-align: center;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.skills-add-modal {
+  width: min(620px, calc(100vw - 32px));
+}
+
+@media (max-width: 980px) {
+  .skills-filter-bar {
+    grid-template-columns: minmax(0, 1fr) minmax(170px, 220px);
+  }
+
+  .skills-result-count {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 700px) {
+  .skills-filter-bar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .skills-clear-filter,
+  .skills-result-count {
+    width: 100%;
+  }
+
+  .skills-result-count {
+    justify-self: stretch;
+  }
+
+  .skills-catalog-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .skills-add-trigger {
+    justify-content: center;
+    width: 100%;
+  }
+}
