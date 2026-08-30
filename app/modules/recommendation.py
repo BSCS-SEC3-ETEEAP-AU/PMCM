@@ -10,6 +10,7 @@ from datetime import datetime
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy import or_
 
 from ..competency_rules import active_project_requirements
 from ..decorators import manager_required
@@ -65,7 +66,7 @@ def _refresh_recommendations(employee_ids):
         return {"created": 0, "updated": 0, "removed": 0}
 
     employees = Employee.query.filter(Employee.id.in_(employee_ids)).all()
-    resources = LearningResource.query.all()
+    resources = LearningResource.query.filter_by(is_active=True).all()
     valid_pairs = set()
     created = 0
     updated = 0
@@ -272,33 +273,150 @@ def complete(rec_id):
 @recommendation_bp.route("/resources")
 @manager_required
 def list_resources():
-    resources = LearningResource.query.order_by(LearningResource.skill_id).all()
+    search = request.args.get("search", "").strip()
+    skill_id = request.args.get("skill_id", "").strip()
+    resource_type = request.args.get("resource_type", "").strip()
+    provider = request.args.get("provider", "").strip()
+    status = request.args.get("status", "all").strip().lower()
+
+    query = LearningResource.query
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(or_(
+            LearningResource.title.ilike(pattern),
+            LearningResource.provider.ilike(pattern),
+            LearningResource.description.ilike(pattern),
+        ))
+    if skill_id.isdigit():
+        query = query.filter(LearningResource.skill_id == int(skill_id))
+    if resource_type:
+        query = query.filter(LearningResource.resource_type == resource_type)
+    if provider:
+        query = query.filter(LearningResource.provider == provider)
+    if status == "active":
+        query = query.filter(LearningResource.is_active.is_(True))
+    elif status == "inactive":
+        query = query.filter(LearningResource.is_active.is_(False))
+
+    resources = query.order_by(
+        LearningResource.is_active.desc(),
+        LearningResource.title.asc(),
+    ).all()
     skills = Skill.query.order_by(Skill.name).all()
-    return render_template("recommendation/resources.html", resources=resources, skills=skills)
+    providers = [
+        row[0] for row in
+        db.session.query(LearningResource.provider)
+        .filter(LearningResource.provider.isnot(None), LearningResource.provider != "")
+        .distinct()
+        .order_by(LearningResource.provider)
+        .all()
+    ]
+    resource_types = ["Course", "Article", "Certification", "Documentation", "Video"]
+    all_resources = LearningResource.query.all()
+    repository_stats = {
+        "total": len(all_resources),
+        "active": sum(1 for resource in all_resources if resource.is_active),
+        "skills": len({resource.skill_id for resource in all_resources if resource.is_active}),
+        "providers": len({resource.provider for resource in all_resources if resource.is_active and resource.provider}),
+    }
+    return render_template(
+        "recommendation/resources.html",
+        resources=resources,
+        skills=skills,
+        providers=providers,
+        resource_types=resource_types,
+        repository_stats=repository_stats,
+        filters={
+            "search": search,
+            "skill_id": skill_id,
+            "resource_type": resource_type,
+            "provider": provider,
+            "status": status,
+        },
+    )
+
+
+def _resource_form_values():
+    allowed_access_types = {"Internal", "Company Subscription", "External"}
+    allowed_resource_types = {"Course", "Article", "Certification", "Documentation", "Video"}
+
+    title = request.form.get("title", "").strip()
+    provider = request.form.get("provider", "").strip()
+    access_type = request.form.get("access_type", "").strip()
+    resource_type = request.form.get("resource_type", "Course").strip()
+    description = request.form.get("description", "").strip()
+    url = request.form.get("url", "").strip()
+
+    try:
+        skill_id = int(request.form.get("skill_id", ""))
+        target_level = int(request.form.get("target_level", "3"))
+    except (TypeError, ValueError):
+        return None, "Skill and target proficiency are required."
+
+    if not title or not provider:
+        return None, "Title and provider/source are required."
+    if access_type not in allowed_access_types:
+        return None, "Please select a valid access type."
+    if resource_type not in allowed_resource_types:
+        return None, "Please select a valid resource type."
+    if target_level not in range(1, 6):
+        return None, "Target proficiency must be between Level 1 and Level 5."
+    if not db.session.get(Skill, skill_id):
+        return None, "Selected skill was not found."
+
+    return {
+        "title": title,
+        "provider": provider,
+        "access_type": access_type,
+        "resource_type": resource_type,
+        "skill_id": skill_id,
+        "target_level": target_level,
+        "description": description or None,
+        "url": url or None,
+    }, None
 
 
 @recommendation_bp.route("/resources/add", methods=["POST"])
 @manager_required
 def add_resource():
-    title = request.form.get("title", "").strip()
-    provider = request.form.get("provider", "").strip()
-    access_type = request.form.get("access_type", "").strip()
-    allowed_access_types = {"Internal", "Company Subscription", "External"}
-
-    if not title or not provider or access_type not in allowed_access_types:
-        flash("Title, provider/source, and a valid access type are required.", "warning")
+    values, error = _resource_form_values()
+    if error:
+        flash(error, "warning")
         return redirect(url_for("recommendation.list_resources"))
 
-    db.session.add(LearningResource(
-        title=title,
-        description=request.form.get("description", "").strip(),
-        skill_id=int(request.form.get("skill_id")),
-        target_level=int(request.form.get("target_level", 3)),
-        resource_type=request.form.get("resource_type", "Course"),
-        provider=provider,
-        access_type=access_type,
-        url=request.form.get("url", "").strip(),
-    ))
+    db.session.add(LearningResource(**values, is_active=True))
     db.session.commit()
-    flash("Learning resource added to repository.", "success")
+    flash("Learning resource added to the repository.", "success")
+    return redirect(url_for("recommendation.list_resources"))
+
+
+@recommendation_bp.route("/resources/<int:resource_id>/edit", methods=["POST"])
+@manager_required
+def edit_resource(resource_id):
+    resource = LearningResource.query.get_or_404(resource_id)
+    values, error = _resource_form_values()
+    if error:
+        flash(error, "warning")
+        return redirect(url_for("recommendation.list_resources"))
+
+    for field, value in values.items():
+        setattr(resource, field, value)
+    db.session.commit()
+    flash(f"{resource.title} updated.", "success")
+    return redirect(url_for("recommendation.list_resources"))
+
+
+@recommendation_bp.route("/resources/<int:resource_id>/toggle", methods=["POST"])
+@manager_required
+def toggle_resource(resource_id):
+    resource = LearningResource.query.get_or_404(resource_id)
+    resource.is_active = not resource.is_active
+    db.session.commit()
+    state = "reactivated" if resource.is_active else "deactivated"
+    flash(
+        f"{resource.title} {state}. "
+        + ("It can be used for new recommendations again." if resource.is_active
+           else "Existing learning history is preserved, but it will not be used for new recommendations."),
+        "success" if resource.is_active else "info",
+    )
     return redirect(url_for("recommendation.list_resources"))

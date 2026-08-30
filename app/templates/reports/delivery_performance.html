@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block page_title %}Delivery Performance Report{% endblock %}
+{% block page_subtitle %}Compare task completion speed, delivery volume and on-time performance using recorded work history{% endblock %}
+{% block content %}
+<div class="report-page-toolbar">
+  <a class="btn secondary" href="{{ url_for('reports.index') }}">← Reports Overview</a>
+</div>
+
+<form class="module-panel report-filter-panel" method="GET" action="{{ url_for('reports.delivery_performance') }}">
+  <div class="report-filter-head"><div><h2>Report Filters</h2><p>Completion-date filters apply to completed tasks and completed projects.</p></div></div>
+  <div class="report-filter-grid report-filter-grid-four">
+    <label><span>Team</span><select name="team"><option value="">All Teams</option>{% for t in teams %}<option value="{{ t }}" {% if selected_team==t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+    <label><span>Project</span><select name="project_id"><option value="">All Projects</option>{% for p in projects %}<option value="{{ p.id }}" {% if selected_project_id==p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></label>
+    <label><span>Completed From</span><input type="date" name="date_from" value="{{ date_from.isoformat() if date_from else '' }}"></label>
+    <label><span>Completed To</span><input type="date" name="date_to" value="{{ date_to.isoformat() if date_to else '' }}"></label>
+  </div>
+  <div class="report-filter-actions"><a class="btn secondary" href="{{ url_for('reports.delivery_performance') }}">Clear</a><button class="btn secondary" type="submit" name="export" value="csv">Export CSV</button><button class="btn primary" type="submit">Apply Filters</button></div>
+</form>
+
+<section class="module-kpi-row report-detail-kpis performance-kpis">
+  <div class="module-kpi-card mk-green"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3a8 8 0 1 0 8 8"/><path d="M12 7v5l3 2"/><path d="m17 3 3 3-3 3"/></svg></span><div><span class="module-kpi-label">Fastest Qualified</span><strong>{{ summary.fastest.avg_label if summary.fastest else '—' }}</strong><small>{% if summary.fastest %}{{ summary.fastest.employee.full_name }} · {{ summary.fastest.completed }} tasks{% else %}Need {{ summary.min_ranked_tasks }} completed tasks{% endif %}</small></div></div>
+  <div class="module-kpi-card mk-blue"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3h12v18H6z"/><path d="m9 11 2 2 4-4M9 17h6"/></svg></span><div><span class="module-kpi-label">Completed Tasks</span><strong>{{ summary.completed_tasks }}</strong><small>Included in the metrics</small></div></div>
+  <div class="module-kpi-card mk-violet"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M16 20v-1.5a4.5 4.5 0 0 0-4.5-4.5h-3A4.5 4.5 0 0 0 4 18.5V20"/><circle cx="10" cy="7.5" r="3.5"/><path d="M16 11a3 3 0 1 0 0-6"/></svg></span><div><span class="module-kpi-label">Employees Tracked</span><strong>{{ summary.employees }}</strong><small>{{ summary.ranked_employees }} ranked · {{ summary.limited_employees }} limited sample</small></div></div>
+  <div class="module-kpi-card mk-amber"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg></span><div><span class="module-kpi-label">On-Time Rate</span><strong>{{ summary.on_time_rate ~ '%' if summary.on_time_rate is not none else '—' }}</strong><small>Tasks with recorded due dates</small></div></div>
+</section>
+
+<section class="performance-report-grid">
+  <article class="module-panel performance-chart-panel">
+    <div class="module-panel-head"><div><h2>Average Task Completion Time</h2><p>Official ranking requires at least {{ summary.min_ranked_tasks }} completed tasks. Lower completion time is better; smaller samples remain visible for context.</p></div></div>
+    <div class="performance-bars">
+      {% for row in rows %}
+      <div class="performance-bar-row {% if row.ranking_eligible and row.rank == 1 %}is-fastest{% elif not row.ranking_eligible %}is-limited-sample{% endif %}">
+        <div class="performance-bar-person">
+          {% if row.ranking_eligible %}<span class="performance-rank">#{{ row.rank }}</span>{% else %}<span class="performance-sample-badge">Limited sample</span>{% endif %}
+          <div><strong>{{ row.employee.full_name }}</strong><small>{{ row.employee.position or '—' }} · {{ row.employee.team or 'Unassigned' }}</small></div>
+        </div>
+        <div class="performance-bar-track" title="Average completion time: {{ row.avg_label }}"><span style="width: {{ row.bar_pct }}%"></span></div>
+        <div class="performance-bar-value"><strong>{{ row.avg_label }}</strong><small>{{ row.completed }} completed{% if not row.ranking_eligible %} · not ranked{% endif %}</small></div>
+      </div>
+      {% else %}
+      <div class="empty-state">No completed tasks with measurable completion time match the selected filters.</div>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="module-panel performance-project-panel">
+    <div class="module-panel-head"><div><h2>Completed Project Delivery</h2><p>Elapsed calendar days from project start to recorded completion. Lower duration indicates faster delivery.</p></div></div>
+    <div class="project-delivery-bars">
+      {% for row in completed_projects %}
+      <div class="project-delivery-row">
+        <div class="project-delivery-copy"><strong>{{ row.project.name }}</strong><small>{{ row.project.manager.full_name }} · Completed {{ row.project.completed_at.strftime('%b %d, %Y') if row.project.completed_at else '—' }}</small></div>
+        {% if row.delivery_days is not none %}
+        <div class="project-delivery-track"><span style="width: {{ row.bar_pct }}%"></span></div>
+        <div class="project-delivery-value"><strong>{{ row.delivery_days }} days</strong><span class="report-status {% if row.delivery_status == 'On Time' %}report-status-completed{% elif row.delivery_status == 'Late' %}report-status-has-gap{% endif %}">{{ row.delivery_status }}</span></div>
+        {% else %}
+        <div class="report-muted">No start date recorded</div><div class="project-delivery-value">—</div>
+        {% endif %}
+      </div>
+      {% else %}
+      <div class="empty-state">No completed projects with recorded completion dates match the selected filters.</div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="module-panel report-table-panel performance-table-panel">
+  <div class="module-panel-head"><div><h2>Employee Delivery Metrics</h2><p>Completion speed is presented together with task volume and deadline reliability to avoid ranking employees on speed alone.</p></div></div>
+  <div class="table-scroll"><table class="data-table report-data-table performance-data-table">
+    <thead><tr><th>Rank</th><th>Employee</th><th>Completed Tasks</th><th>Avg. Completion</th><th>Fastest Task</th><th>On Time</th><th>Late</th><th>On-Time Rate</th></tr></thead>
+    <tbody>{% for row in rows %}<tr class="{% if not row.ranking_eligible %}performance-limited-row{% endif %}">
+      <td>{% if row.ranking_eligible %}<strong>#{{ row.rank }}</strong>{% else %}<span class="report-status report-status-no-active-target">Limited Sample</span>{% endif %}</td>
+      <td><strong>{{ row.employee.full_name }}</strong><span class="report-subtext">{{ row.employee.position or '—' }} · {{ row.employee.team or 'Unassigned' }}</span></td>
+      <td>{{ row.completed }}</td><td><strong>{{ row.avg_label }}</strong></td><td>{{ row.fastest_label }}</td><td>{{ row.on_time }}</td><td>{{ row.late }}</td>
+      <td>{% if row.on_time_rate is not none %}<span class="report-status {% if row.on_time_rate >= 80 %}report-status-completed{% elif row.on_time_rate >= 50 %}report-status-in-progress{% else %}report-status-has-gap{% endif %}">{{ row.on_time_rate }}%</span>{% else %}<span class="report-muted">No due dates</span>{% endif %}</td>
+    </tr>{% else %}<tr><td colspan="8"><div class="empty-state">No employee delivery metrics are available for the selected filters.</div></td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+
+<div class="performance-method-note">
+  <strong>How this is calculated:</strong> task completion time is measured from the first recorded work start to the final Done timestamp. An employee needs at least {{ summary.min_ranked_tasks }} completed tasks in the selected report scope to receive an official rank; smaller samples remain visible but cannot determine the Fastest Qualified metric. On-time rate compares the recorded completion date with each task due date. Reopened tasks stop counting as completed until they reach Done again.
+</div>
+{% endblock %}

@@ -158,3 +158,109 @@ def accounts():
     users = User.query.order_by(User.role, User.full_name).all()
     open_request_count = AccountAssistanceRequest.query.filter_by(status="Open").count()
     return render_template("auth/accounts.html", users=users, open_request_count=open_request_count)
+
+
+@auth_bp.route("/accounts/create", methods=["POST"])
+@admin_required
+def create_account():
+    username = request.form.get("username", "").strip()
+    full_name = request.form.get("full_name", "").strip()
+    email = request.form.get("email", "").strip()
+    password = request.form.get("password", "")
+    confirm_password = request.form.get("confirm_password", "")
+    role = request.form.get("role", "employee").strip().lower()
+    position = request.form.get("position", "").strip()
+    team = request.form.get("team", "").strip()
+    work_mode = request.form.get("work_mode", "onsite").strip().lower()
+
+    try:
+        project_capacity = int(request.form.get("project_capacity", "3"))
+    except (TypeError, ValueError):
+        project_capacity = -1
+
+    if not username or not full_name or not position or not team:
+        flash("Username, full name, position, and department/team are required.", "danger")
+        return redirect(url_for("auth.accounts"))
+    if role not in ("admin", "manager", "employee"):
+        flash("Please select a valid account role.", "danger")
+        return redirect(url_for("auth.accounts"))
+    if work_mode not in ("onsite", "remote", "hybrid"):
+        flash("Please select a valid work mode.", "danger")
+        return redirect(url_for("auth.accounts"))
+    if not 0 <= project_capacity <= 20:
+        flash("Project capacity must be between 0 and 20.", "danger")
+        return redirect(url_for("auth.accounts"))
+    if len(password) < 8:
+        flash("The initial password must contain at least 8 characters.", "danger")
+        return redirect(url_for("auth.accounts"))
+    if password != confirm_password:
+        flash("Password confirmation does not match.", "danger")
+        return redirect(url_for("auth.accounts"))
+    if User.query.filter(db.func.lower(User.username) == username.lower()).first():
+        flash(f'Username "{username}" is already in use.', "danger")
+        return redirect(url_for("auth.accounts"))
+
+    user = User(
+        username=username,
+        full_name=full_name,
+        email=email or None,
+        role=role,
+        position=position,
+        work_mode=work_mode,
+        is_active=True,
+    )
+    user.set_password(password)
+    db.session.add(user)
+    db.session.flush()
+
+    employee = Employee(
+        user_id=user.id,
+        full_name=full_name,
+        position=position,
+        team=team,
+        work_mode=work_mode,
+        availability_status="Available",
+        project_capacity=project_capacity,
+    )
+    db.session.add(employee)
+    db.session.commit()
+
+    flash(f"Account created for {full_name}. The employee profile is ready for project and task assignment.", "success")
+    return redirect(url_for("auth.accounts"))
+
+
+@auth_bp.route("/accounts/<int:user_id>/status", methods=["POST"])
+@admin_required
+def update_account_status(user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        flash("User account not found.", "danger")
+        return redirect(url_for("auth.accounts"))
+
+    status = request.form.get("status", "").strip().lower()
+    if status not in ("active", "disabled"):
+        flash("Invalid account status.", "danger")
+        return redirect(url_for("auth.accounts"))
+
+    should_activate = status == "active"
+    if not should_activate and user.id == current_user.id:
+        flash("You cannot disable the account you are currently using.", "danger")
+        return redirect(url_for("auth.accounts"))
+
+    if not should_activate and user.role == "admin":
+        active_admins = User.query.filter_by(role="admin", is_active=True).count()
+        if active_admins <= 1:
+            flash("The last active Administrator account cannot be disabled.", "danger")
+            return redirect(url_for("auth.accounts"))
+
+    user.is_active = should_activate
+    employee = Employee.query.filter_by(user_id=user.id).first()
+    if employee and not should_activate:
+        employee.availability_status = "Unavailable"
+
+    db.session.commit()
+    if should_activate:
+        flash(f"{user.full_name}'s account has been activated. Project availability can be managed separately from Team Members.", "success")
+    else:
+        flash(f"{user.full_name}'s account has been disabled and removed from new project/task assignment eligibility.", "success")
+    return redirect(url_for("auth.accounts"))

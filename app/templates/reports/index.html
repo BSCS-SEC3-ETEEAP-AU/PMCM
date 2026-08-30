@@ -4,16 +4,16 @@
 {% block content %}
 <section class="module-kpi-row reports-kpi-row" aria-label="Report summary">
   <a class="module-kpi-card mk-green" href="{{ url_for('reports.project_status') }}">
-    <span class="module-kpi-icon">↗</span><div><span class="module-kpi-label">Project Status</span><strong>{{ report_summary.total_projects }}</strong><small>Total projects</small></div>
+    <span class="module-kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M9 3.5h6v3H9z"/><path d="m8.5 12 2 2 5-5"/><path d="M9 17h6"/></svg></span><div><span class="module-kpi-label">Project Status</span><strong>{{ report_summary.total_projects }}</strong><small>Total projects</small></div>
   </a>
   <a class="module-kpi-card mk-blue" href="{{ url_for('reports.workforce_summary') }}">
-    <span class="module-kpi-icon">▥</span><div><span class="module-kpi-label">Team Coverage</span><strong>{{ report_summary.team_members }}</strong><small>Team members</small></div>
+    <span class="module-kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M16 20v-1.5a4.5 4.5 0 0 0-4.5-4.5h-3A4.5 4.5 0 0 0 4 18.5V20"/><circle cx="10" cy="7.5" r="3.5"/><path d="M16 11a3 3 0 1 0 0-6"/><path d="M18 14a4 4 0 0 1 2 3.5V20"/></svg></span><div><span class="module-kpi-label">Team Coverage</span><strong>{{ report_summary.team_members }}</strong><small>Team members</small></div>
   </a>
   <a class="module-kpi-card mk-amber" href="{{ url_for('reports.competency_report') }}">
-    <span class="module-kpi-icon">◎</span><div><span class="module-kpi-label">Competency Gaps</span><strong>{{ report_summary.gap_count }}</strong><small>Open project-driven gaps</small></div>
+    <span class="module-kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="M12 2v3M22 12h-3M12 22v-3M2 12h3"/></svg></span><div><span class="module-kpi-label">Competency Gaps</span><strong>{{ report_summary.gap_count }}</strong><small>Open project-driven gaps</small></div>
   </a>
   <a class="module-kpi-card mk-violet" href="{{ url_for('reports.learning_progress') }}">
-    <span class="module-kpi-icon">◇</span><div><span class="module-kpi-label">Learning Completion</span><strong>{{ report_summary.learning_completion }}%</strong><small>Completion rate</small></div>
+    <span class="module-kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m3 9 9-5 9 5-9 5-9-5Z"/><path d="M7 12v4.5c2.8 2 7.2 2 10 0V12"/><path d="M21 9v6"/></svg></span><div><span class="module-kpi-label">Learning Completion</span><strong>{{ report_summary.learning_completion }}%</strong><small>Completion rate</small></div>
   </a>
 </section>
 
@@ -50,20 +50,24 @@
   <div class="module-panel-head"><div><h2>Available Reports</h2><p>Generate filtered management views and export the current results to CSV</p></div></div>
   <div class="available-report-grid">
     <a class="available-report-card" href="{{ url_for('reports.project_status') }}">
-      <span class="available-report-icon report-icon-project">↗</span>
+      <span class="available-report-icon report-icon-project" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M9 3.5h6v3H9z"/><path d="M8 11h8M8 15h5"/></svg></span>
       <div><strong>Project Status Report</strong><p>Project progress, managers, deadlines, task completion and milestones.</p><span>Open report →</span></div>
     </a>
     <a class="available-report-card" href="{{ url_for('reports.competency_report') }}">
-      <span class="available-report-icon report-icon-competency">◎</span>
+      <span class="available-report-icon report-icon-competency" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="M12 2v3M22 12h-3M12 22v-3M2 12h3"/></svg></span>
       <div><strong>Competency Report</strong><p>Current proficiency, project targets, competency gaps and requirement sources.</p><span>Open report →</span></div>
     </a>
     <a class="available-report-card" href="{{ url_for('reports.learning_progress') }}">
-      <span class="available-report-icon report-icon-learning">◇</span>
+      <span class="available-report-icon report-icon-learning" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H12v16H6.5A2.5 2.5 0 0 0 4 21.5v-16Z"/><path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H12v16h5.5a2.5 2.5 0 0 1 2.5 2.5v-16Z"/></svg></span>
       <div><strong>Learning Progress Report</strong><p>Recommended, in-progress and completed development activities by employee.</p><span>Open report →</span></div>
     </a>
     <a class="available-report-card" href="{{ url_for('reports.workforce_summary') }}">
-      <span class="available-report-icon report-icon-workforce">▥</span>
+      <span class="available-report-icon report-icon-workforce" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M16 20v-1.5a4.5 4.5 0 0 0-4.5-4.5h-3A4.5 4.5 0 0 0 4 18.5V20"/><circle cx="10" cy="7.5" r="3.5"/><path d="M16 11a3 3 0 1 0 0-6"/><path d="M18 14a4 4 0 0 1 2 3.5V20"/></svg></span>
       <div><strong>Workforce Summary</strong><p>Team readiness, project requirements, open gaps and learning progress.</p><span>Open report →</span></div>
+    </a>
+    <a class="available-report-card" href="{{ url_for('reports.delivery_performance') }}">
+      <span class="available-report-icon report-icon-performance" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="13" r="7"/><path d="M12 6V3M9 3h6M12 10v3l3 2"/><path d="m17.5 7.5 1.5-1.5"/></svg></span>
+      <div><strong>Delivery Performance</strong><p>Task completion speed, delivery volume, on-time rate and completed-project duration.</p><span>Open report →</span></div>
     </a>
   </div>
 </section>
@@ -74,7 +78,7 @@
     {% for log in recent_reports %}
     <div class="recent-report-item">
       <span class="recent-report-dot"></span>
-      <div><strong>{{ log.report_type }}</strong><small>{{ log.filters or 'No filters' }}</small></div>
+      <div><strong>{{ log.report_type }}</strong><small><span class="recent-report-filter-label">Filter:</span> {{ log.filters or 'No filters' }}</small></div>
       <time>{{ log.generated_at.strftime('%b %d, %Y') if log.generated_at else '—' }}</time>
     </div>
     {% else %}

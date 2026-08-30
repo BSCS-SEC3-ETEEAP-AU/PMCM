@@ -418,6 +418,220 @@ def learning_progress():
     )
 
 
+MIN_RANKED_TASKS = 2
+
+
+def _duration_label(hours):
+    if hours is None:
+        return "—"
+    if hours < 1:
+        return f"{max(1, round(hours * 60))} min"
+    if hours < 24:
+        return f"{hours:.1f} hrs"
+    return f"{hours / 24:.1f} days"
+
+
+@reports_bp.route("/delivery-performance")
+@manager_required
+def delivery_performance():
+    """Behavioral delivery metrics based on recorded task/project completion timestamps."""
+    team = (request.args.get("team") or "").strip()
+    project_id = request.args.get("project_id", type=int)
+    date_from = _date_arg("date_from")
+    date_to = _date_arg("date_to")
+
+    employees = Employee.query.order_by(Employee.full_name).all()
+    projects = Project.query.order_by(Project.name).all()
+    teams = sorted({employee.team for employee in employees if employee.team})
+
+    completed_tasks = (
+        Task.query
+        .join(Employee, Employee.id == Task.assignee_id)
+        .join(Project, Project.id == Task.project_id)
+        .filter(
+            Task.status == "Done",
+            Task.completed_at.isnot(None),
+            Task.assignee_id.isnot(None),
+        )
+        .all()
+    )
+
+    filtered_tasks = []
+    for task in completed_tasks:
+        employee = task.assignee
+        if not employee:
+            continue
+        if team and employee.team != team:
+            continue
+        if project_id and task.project_id != project_id:
+            continue
+        completed_date = task.completed_at.date() if task.completed_at else None
+        if date_from and (not completed_date or completed_date < date_from):
+            continue
+        if date_to and (not completed_date or completed_date > date_to):
+            continue
+        filtered_tasks.append(task)
+
+    by_employee = {}
+    for task in filtered_tasks:
+        employee = task.assignee
+        started_at = task.started_at or task.created_at
+        if not started_at or not task.completed_at or task.completed_at < started_at:
+            continue
+        duration_hours = (task.completed_at - started_at).total_seconds() / 3600
+        stats = by_employee.setdefault(employee.id, {
+            "employee": employee,
+            "durations": [],
+            "completed": 0,
+            "due_tracked": 0,
+            "on_time": 0,
+            "late": 0,
+        })
+        stats["durations"].append(duration_hours)
+        stats["completed"] += 1
+        if task.due_date:
+            stats["due_tracked"] += 1
+            if task.completed_at.date() <= task.due_date:
+                stats["on_time"] += 1
+            else:
+                stats["late"] += 1
+
+    employee_rows = []
+    for stats in by_employee.values():
+        durations = stats["durations"]
+        if not durations:
+            continue
+        avg_hours = sum(durations) / len(durations)
+        fastest_hours = min(durations)
+        on_time_rate = (
+            round(100 * stats["on_time"] / stats["due_tracked"])
+            if stats["due_tracked"]
+            else None
+        )
+        employee_rows.append({
+            "employee": stats["employee"],
+            "completed": stats["completed"],
+            "avg_hours": avg_hours,
+            "avg_label": _duration_label(avg_hours),
+            "fastest_hours": fastest_hours,
+            "fastest_label": _duration_label(fastest_hours),
+            "on_time": stats["on_time"],
+            "late": stats["late"],
+            "due_tracked": stats["due_tracked"],
+            "on_time_rate": on_time_rate,
+        })
+
+    # A single unusually small task should not determine the official "fastest" ranking.
+    # Employees remain visible with limited samples, but an official rank requires
+    # at least MIN_RANKED_TASKS completed tasks in the selected report scope.
+    for row in employee_rows:
+        row["ranking_eligible"] = row["completed"] >= MIN_RANKED_TASKS
+        row["rank"] = None
+
+    ranked_rows = sorted(
+        (row for row in employee_rows if row["ranking_eligible"]),
+        key=lambda row: (row["avg_hours"], -row["completed"], row["employee"].full_name.lower()),
+    )
+    limited_rows = sorted(
+        (row for row in employee_rows if not row["ranking_eligible"]),
+        key=lambda row: (row["avg_hours"], row["employee"].full_name.lower()),
+    )
+    for index, row in enumerate(ranked_rows, start=1):
+        row["rank"] = index
+
+    employee_rows = ranked_rows + limited_rows
+    max_avg = max((row["avg_hours"] for row in employee_rows), default=1) or 1
+    for row in employee_rows:
+        row["bar_pct"] = round(100 * row["avg_hours"] / max_avg, 1)
+
+    total_completed = sum(row["completed"] for row in employee_rows)
+    total_due_tracked = sum(row["due_tracked"] for row in employee_rows)
+    total_on_time = sum(row["on_time"] for row in employee_rows)
+    overall_avg = (
+        sum(row["avg_hours"] * row["completed"] for row in employee_rows) / total_completed
+        if total_completed
+        else None
+    )
+    fastest = ranked_rows[0] if ranked_rows else None
+    summary = {
+        "employees": len(employee_rows),
+        "ranked_employees": len(ranked_rows),
+        "limited_employees": len(limited_rows),
+        "min_ranked_tasks": MIN_RANKED_TASKS,
+        "completed_tasks": total_completed,
+        "overall_avg": _duration_label(overall_avg),
+        "on_time_rate": round(100 * total_on_time / total_due_tracked) if total_due_tracked else None,
+        "fastest": fastest,
+    }
+
+    team_project_ids = None
+    if team:
+        team_project_ids = {
+            row.project_id
+            for row in (
+                ProjectMember.query
+                .join(Employee, Employee.id == ProjectMember.employee_id)
+                .filter(Employee.team == team)
+                .all()
+            )
+        }
+
+    completed_projects = []
+    for project in Project.query.filter(Project.status == "Completed", Project.completed_at.isnot(None)).all():
+        if project_id and project.id != project_id:
+            continue
+        if team_project_ids is not None and project.id not in team_project_ids:
+            continue
+        completed_date = project.completed_at.date() if project.completed_at else None
+        if date_from and (not completed_date or completed_date < date_from):
+            continue
+        if date_to and (not completed_date or completed_date > date_to):
+            continue
+        delivery_days = None
+        if project.start_date and completed_date:
+            delivery_days = max(0, (completed_date - project.start_date).days)
+        if project.target_date and completed_date:
+            delivery_status = "On Time" if completed_date <= project.target_date else "Late"
+        else:
+            delivery_status = "No Target"
+        completed_projects.append({
+            "project": project,
+            "delivery_days": delivery_days,
+            "delivery_status": delivery_status,
+        })
+    completed_projects.sort(key=lambda row: (row["delivery_days"] is None, row["delivery_days"] or 0, row["project"].name.lower()))
+    max_project_days = max((row["delivery_days"] or 0 for row in completed_projects), default=1) or 1
+    for row in completed_projects:
+        row["bar_pct"] = round(100 * (row["delivery_days"] or 0) / max_project_days, 1)
+
+    filters = _report_query_params()
+    if request.args.get("export") == "csv":
+        _log("Delivery Performance CSV", filters)
+        return _csv_response(
+            "delivery_performance",
+            [
+                "Rank", "Ranking Status", "Employee", "Team", "Position", "Completed Tasks",
+                "Average Completion Time", "Fastest Task", "On-Time Tasks",
+                "Late Tasks", "On-Time Rate %",
+            ],
+            [[
+                row["rank"] or "", "Ranked" if row["ranking_eligible"] else "Limited Sample",
+                row["employee"].full_name, row["employee"].team or "",
+                row["employee"].position or "", row["completed"], row["avg_label"],
+                row["fastest_label"], row["on_time"], row["late"],
+                row["on_time_rate"] if row["on_time_rate"] is not None else "",
+            ] for row in employee_rows],
+        )
+
+    _log("Delivery Performance Report", filters)
+    return render_template(
+        "reports/delivery_performance.html",
+        rows=employee_rows, projects=projects, teams=teams, summary=summary,
+        completed_projects=completed_projects, selected_team=team,
+        selected_project_id=project_id, date_from=date_from, date_to=date_to,
+    )
+
+
 @reports_bp.route("/workforce-summary")
 @manager_required
 def workforce_summary():

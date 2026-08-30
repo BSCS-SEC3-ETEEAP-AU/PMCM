@@ -1,30 +1,137 @@
 {% extends "base.html" %}
 {% block title %}User Accounts · SPM&ECD{% endblock %}
 {% block page_title %}User Accounts{% endblock %}
-{% block page_subtitle %}Manage role-based system access and review account assistance requests{% endblock %}
+{% block page_subtitle %}Create, activate and disable role-based system accounts{% endblock %}
 {% block content %}
 <div class="module-toolbar account-toolbar">
-  <div></div>
+  <div class="module-toolbar-copy">
+    <strong>{{ users|length }} registered account{{ '' if users|length == 1 else 's' }}</strong>
+    <span>Every team member has a linked login account for project and task participation.</span>
+  </div>
   <div class="module-toolbar-actions">
+    <button class="btn primary" type="button" onclick="document.getElementById('create-account-modal').showModal()">+ Add User</button>
     <a class="btn secondary" href="{{ url_for('auth.account_requests') }}">Account Requests{% if open_request_count %} ({{ open_request_count }}){% endif %}</a>
   </div>
 </div>
+
 <div class="module-panel">
   <div class="table-wrap">
-    <table class="data-table">
-      <thead><tr><th>Username</th><th>Full Name</th><th>Position</th><th>Role</th><th>Work Mode</th><th>Status</th></tr></thead>
+    <table class="data-table account-management-table">
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Full Name</th>
+          <th>Position</th>
+          <th>Role</th>
+          <th>Work Mode</th>
+          <th>Account Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
       <tbody>
       {% for u in users %}
-        <tr>
-          <td>{{ u.username }}</td><td>{{ u.full_name }}</td><td>{{ u.position }}</td>
-          <td><span class="role-badge role-{{ u.role }}">{{ u.role.title() }}</span></td>
-          <td>{{ u.work_mode }}</td>
-          <td>{% if u.is_active %}<span class="account-status"><i></i>Active</span>{% else %}<span class="account-status disabled"><i></i>Disabled</span>{% endif %}</td>
+        <tr class="{{ 'account-row-disabled' if not u.is_active else '' }}">
+          <td><strong>{{ u.username }}</strong>{% if u.email %}<small class="account-email">{{ u.email }}</small>{% endif %}</td>
+          <td>{{ u.full_name }}</td>
+          <td>{{ u.position or '—' }}</td>
+          <td><span class="role-badge role-{{ u.role }}">{{ 'Administrator' if u.role == 'admin' else u.role.title() }}</span></td>
+          <td>{{ (u.work_mode or 'onsite').title() }}</td>
+          <td>
+            {% if u.is_active %}
+              <span class="account-status"><i></i>Active</span>
+            {% else %}
+              <span class="account-status disabled"><i></i>Disabled</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if u.id == current_user.id %}
+              <span class="account-current-user">Current account</span>
+            {% elif u.is_active %}
+              <form method="POST" action="{{ url_for('auth.update_account_status', user_id=u.id) }}" onsubmit="return confirm('Disable {{ u.full_name|e }}? They will no longer be able to sign in or receive new project/task assignments. Existing project and task history will be preserved.');">
+                <input type="hidden" name="status" value="disabled">
+                <button class="btn small account-disable-btn" type="submit">Disable</button>
+              </form>
+            {% else %}
+              <form method="POST" action="{{ url_for('auth.update_account_status', user_id=u.id) }}">
+                <input type="hidden" name="status" value="active">
+                <button class="btn small secondary" type="submit">Activate</button>
+              </form>
+            {% endif %}
+          </td>
         </tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
-<p class="muted">Account provisioning remains Administrator-managed. Login assistance requests can be reviewed from Account Requests.</p>
+
+<dialog class="project-modal account-user-modal" id="create-account-modal">
+  <form class="project-modal-card" method="POST" action="{{ url_for('auth.create_account') }}">
+    <div class="project-modal-head">
+      <div>
+        <span class="project-modal-kicker">Administrator</span>
+        <h3>Add User Account</h3>
+      </div>
+      <button class="project-modal-close" type="button" aria-label="Close" onclick="document.getElementById('create-account-modal').close()">×</button>
+    </div>
+    <p class="project-modal-copy">Create the login account and linked employee profile in one step. New users are active and available for assignment by default.</p>
+
+    <div class="project-modal-grid">
+      <div class="project-modal-field">
+        <label for="account-full-name">Full Name</label>
+        <input id="account-full-name" name="full_name" type="text" maxlength="120" required placeholder="e.g. Juan Dela Cruz">
+      </div>
+      <div class="project-modal-field">
+        <label for="account-username">Username</label>
+        <input id="account-username" name="username" type="text" maxlength="64" required autocomplete="off" placeholder="e.g. emp_jdelacruz">
+      </div>
+      <div class="project-modal-field">
+        <label for="account-email">Email <span class="field-optional">Optional</span></label>
+        <input id="account-email" name="email" type="email" maxlength="120" placeholder="name@company.com">
+      </div>
+      <div class="project-modal-field">
+        <label for="account-role">Role</label>
+        <select id="account-role" name="role" required>
+          <option value="employee">Employee</option>
+          <option value="manager">Manager</option>
+          <option value="admin">Administrator</option>
+        </select>
+      </div>
+      <div class="project-modal-field">
+        <label for="account-position">Position / Title</label>
+        <input id="account-position" name="position" type="text" maxlength="80" required placeholder="e.g. Data Engineer">
+      </div>
+      <div class="project-modal-field">
+        <label for="account-team">Department / Team</label>
+        <input id="account-team" name="team" type="text" maxlength="80" required placeholder="e.g. Data Engineering">
+      </div>
+      <div class="project-modal-field">
+        <label for="account-work-mode">Work Mode</label>
+        <select id="account-work-mode" name="work_mode" required>
+          <option value="onsite">Onsite</option>
+          <option value="hybrid">Hybrid</option>
+          <option value="remote">Remote</option>
+        </select>
+      </div>
+      <div class="project-modal-field">
+        <label for="account-capacity">Maximum Active Projects</label>
+        <input id="account-capacity" name="project_capacity" type="number" min="0" max="20" value="3" required>
+        <small>This can be adjusted later by a Manager or Administrator.</small>
+      </div>
+      <div class="project-modal-field">
+        <label for="account-password">Initial Password</label>
+        <input id="account-password" name="password" type="password" minlength="8" required autocomplete="new-password">
+      </div>
+      <div class="project-modal-field">
+        <label for="account-confirm-password">Confirm Password</label>
+        <input id="account-confirm-password" name="confirm_password" type="password" minlength="8" required autocomplete="new-password">
+      </div>
+    </div>
+
+    <div class="project-modal-actions">
+      <button class="btn secondary" type="button" onclick="document.getElementById('create-account-modal').close()">Cancel</button>
+      <button class="btn primary" type="submit">Create User</button>
+    </div>
+  </form>
+</dialog>
 {% endblock %}

@@ -43,82 +43,104 @@
   </div>
 </div>
 
-<div class="dash-grid">
-  <div class="card">
-    <h3>Tasks</h3>
-    <p class="muted">Manage task assignments and workflow for this project.</p>
-    <div class="board">
-      {% for st in statuses %}
-      <div class="board-col">
-        <div class="board-head">{{ st }} <small>({{ tasks|selectattr('status','equalto',st)|list|length }})</small></div>
-        {% for t in tasks if t.status == st %}
-        <div class="ticket task-priority-{{ t.priority|lower }} task-deadline-{{ t.deadline_state }}">
-          <div class="t-title">{{ t.title }}</div>
-          <div class="t-meta">
-            <span class="prio prio-{{ t.priority|lower }}">{{ t.priority }}</span>
-            {% if t.assignee %}<span>{{ t.assignee.full_name }}</span>{% endif %}
-          </div>
-          {% if t.due_date %}<div class="ticket-due ticket-due-{{ t.deadline_state }}">Due {{ t.due_date.strftime('%b %d, %Y') }}{% if t.status != 'Done' %} · <strong>{{ t.deadline_label }}</strong>{% endif %}</div>{% endif %}
-          {% if can_manage_project or (current_user.role == 'employee' and t.assignee and t.assignee.user_id == current_user.id) %}
-          <form method="POST" action="{{ url_for('projects.update_task', task_id=t.id) }}">
-            <select name="status" onchange="this.form.submit()">
-              {% for s in statuses %}<option {% if s==t.status %}selected{% endif %}>{{ s }}</option>{% endfor %}
-            </select>
-          </form>
-          {% endif %}
-        </div>
-        {% endfor %}
-      </div>
-      {% endfor %}
+<div class="card project-tasks-card">
+  <div class="project-section-toolbar">
+    <div>
+      <h3>Tasks</h3>
+      <p class="muted">Manage task assignments and workflow for this project.</p>
     </div>
-
     {% if can_manage_project %}
-    <form class="inline-form" method="POST" action="{{ url_for('projects.create_task', project_id=project.id) }}">
-      <input type="text" name="title" placeholder="New task title" required>
-      <select name="assignee_id">
-        <option value="">— Assignee —</option>
-        {% for e in employees %}<option value="{{ e.id }}">{{ e.full_name }}</option>{% endfor %}
-      </select>
-      <select name="status">
-        {% for s in statuses %}<option>{{ s }}</option>{% endfor %}
-      </select>
-      <select name="priority">
-        <option>Low</option><option selected>Medium</option><option>High</option>
-      </select>
-      <select name="required_skill_id">
-        <option value="">— Skill —</option>
-        {% for s in skills %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
-      </select>
-      <input type="number" name="required_level" value="3" min="1" max="5" title="Required level">
-      <input type="date" name="due_date" title="Task due date">
-      <button class="btn primary" type="submit">Add Task</button>
-    </form>
+    <button class="btn primary" type="button" onclick="document.getElementById('taskCreateDialog').showModal()">+ Add Task</button>
     {% endif %}
   </div>
 
-  <div class="card">
-    <h3>Team ({{ members|length }})</h3>
-    <ul class="member-list">
-      {% for m in members %}<li>{{ m.full_name }} <small>· {{ m.position }} · {{ m.work_mode }}</small></li>{% else %}<li class="muted">No members assigned.</li>{% endfor %}
-    </ul>
+  <div class="board project-task-board">
+    {% for st in statuses %}
+    <div class="board-col">
+      <div class="board-head"><span>{{ st }}</span><small>{{ tasks|selectattr('status','equalto',st)|list|length }}</small></div>
+      {% for t in tasks if t.status == st %}
+      <div class="ticket task-priority-{{ t.priority|lower }} task-deadline-{{ t.deadline_state }}">
+        <div class="t-title">{{ t.title }}</div>
+        <div class="t-meta task-card-meta">
+          <span class="prio prio-{{ t.priority|lower }}">{{ t.priority }}</span>
+          {% if t.assignee %}<span class="task-assignee">{{ t.assignee.full_name }}</span>{% else %}<span class="task-assignee muted">Unassigned</span>{% endif %}
+        </div>
+        {% if t.required_skill %}
+        <div class="task-skill-line">
+          <span>{{ t.required_skill.name }}</span>
+          <strong>L{{ t.required_level }}</strong>
+        </div>
+        {% endif %}
+        {% if t.due_date %}
+        <div class="task-due-row">
+          <span>Due {{ t.due_date.strftime('%b %d, %Y') }}</span>
+          {% if t.status != 'Done' %}<span class="deadline-badge deadline-{{ t.deadline_state }}">{{ t.deadline_label }}</span>{% else %}<span class="deadline-badge deadline-completed">Completed</span>{% endif %}
+        </div>
+        {% endif %}
+        {% if can_manage_project or (current_user.role == 'employee' and t.assignee and t.assignee.user_id == current_user.id) %}
+        <form class="task-status-form" method="POST" action="{{ url_for('projects.update_task', task_id=t.id) }}">
+          <label for="task-status-{{ t.id }}">Workflow Status</label>
+          <select id="task-status-{{ t.id }}" name="status" onchange="this.form.submit()">
+            {% for s in statuses %}<option {% if s==t.status %}selected{% endif %}>{{ s }}</option>{% endfor %}
+          </select>
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% if not (tasks|selectattr('status','equalto',st)|list) %}<div class="board-empty">No tasks</div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
 
-    <div class="project-section-head">
+<div class="project-detail-lower-grid">
+  <section class="card project-team-card">
+    <div class="project-section-toolbar compact">
+      <div>
+        <h3>Project Team</h3>
+        <p class="muted">Members currently assigned to this project.</p>
+      </div>
+      <span class="section-count-pill">{{ members|length }} member{{ '' if members|length == 1 else 's' }}</span>
+    </div>
+    <div class="project-team-grid">
+      {% for m in members %}
+      <article class="project-team-member">
+        <span class="project-team-avatar" aria-hidden="true">{{ m.full_name[:1] }}</span>
+        <div class="project-team-info">
+          <strong>{{ m.full_name }}</strong>
+          <span>{{ m.position or 'Team Member' }}</span>
+          <small>{{ m.team or '—' }}</small>
+        </div>
+        <span class="work-mode-pill work-mode-{{ (m.work_mode or 'onsite')|lower|replace(' ','-') }}">{{ (m.work_mode or 'Onsite')|title }}</span>
+      </article>
+      {% else %}
+      <div class="empty-state">No members assigned.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="card project-milestones-card">
+    <div class="project-section-toolbar compact">
       <div>
         <h3>Milestones</h3>
-        <p class="muted">These milestone due dates feed the dashboard's Upcoming Deadlines card.</p>
+        <p class="muted">Project checkpoints and dates used by the dashboard's upcoming-deadlines view.</p>
       </div>
+      {% if can_manage_project %}
+      <button class="btn secondary" type="button" onclick="document.getElementById('milestoneCreateDialog').showModal()">+ Add Milestone</button>
+      {% endif %}
     </div>
 
-    <div class="milestone-stack">
+    <div class="milestone-timeline">
       {% for ms in milestones %}
-      <div class="milestone-item {% if ms.achieved %}done{% endif %}">
+      <article class="milestone-item milestone-state-{{ ms.deadline_state }}">
+        <span class="milestone-marker" aria-hidden="true"></span>
         <div class="milestone-summary-row">
           <div class="milestone-summary-main">
             <div class="milestone-title-line">
               <strong>{{ ms.title }}</strong>
-              {% if ms.achieved %}<span class="milestone-status complete">Completed</span>{% endif %}
+              <span class="milestone-status {{ ms.deadline_state }}">{{ ms.deadline_label }}</span>
             </div>
-            <small class="milestone-date">{{ ('Due ' ~ ms.due_date.strftime('%b %d, %Y')) if ms.due_date else 'No due date' }}</small>
+            <small class="milestone-date">{{ ('Due ' ~ ms.due_date.strftime('%b %d, %Y')) if ms.due_date else 'No due date set' }}</small>
           </div>
           {% if can_manage_project %}
           <details class="milestone-edit-details">
@@ -141,37 +163,101 @@
           </details>
           {% endif %}
         </div>
-      </div>
+      </article>
       {% else %}
-      <p class="muted">No milestones yet.</p>
+      <div class="empty-state">No milestones yet.</div>
       {% endfor %}
     </div>
-
-    {% if can_manage_project %}
-    <details class="milestone-create-details">
-      <summary class="btn">+ Add Milestone</summary>
-      <form class="milestone-create-form" method="POST" action="{{ url_for('projects.create_milestone', project_id=project.id) }}">
-        <div class="milestone-create-head">
-          <strong>New Milestone</strong>
-          <span class="muted">Add a project checkpoint and due date.</span>
-        </div>
-        <div class="milestone-create-grid">
-          <div class="milestone-field">
-            <label>Milestone title</label>
-            <input type="text" name="title" placeholder="e.g. UAT sign-off" required>
-          </div>
-          <div class="milestone-field">
-            <label>Due date</label>
-            <input type="date" name="due_date">
-          </div>
-        </div>
-        <div class="milestone-edit-actions">
-          <button class="btn small secondary" type="button" onclick="this.closest('details').removeAttribute('open')">Cancel</button>
-          <button class="btn small" type="submit">Add Milestone</button>
-        </div>
-      </form>
-    </details>
-    {% endif %}
-  </div>
+  </section>
 </div>
+
+{% if can_manage_project %}
+<dialog class="project-modal" id="taskCreateDialog">
+  <form class="project-modal-card task-create-form" method="POST" action="{{ url_for('projects.create_task', project_id=project.id) }}">
+    <div class="project-modal-head">
+      <div><span class="project-modal-kicker">Project Task</span><h3>Add Task</h3></div>
+      <button class="project-modal-close" type="button" aria-label="Close" onclick="this.closest('dialog').close()">×</button>
+    </div>
+    <p class="project-modal-copy">Create a work item, assign a current project member and define the competency needed to complete it.</p>
+    <div class="project-modal-grid">
+      <div class="project-modal-field full">
+        <label>Task Title</label>
+        <input type="text" name="title" placeholder="e.g. Validate API response mapping" required>
+      </div>
+      <div class="project-modal-field">
+        <label>Assignee</label>
+        <select name="assignee_id">
+          <option value="">— Unassigned —</option>
+          {% for e in employees %}<option value="{{ e.id }}">{{ e.full_name }} · {{ e.position }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="project-modal-field">
+        <label>Workflow Status</label>
+        <select name="status">{% for s in statuses %}<option>{{ s }}</option>{% endfor %}</select>
+      </div>
+      <div class="project-modal-field">
+        <label>Priority</label>
+        <select name="priority"><option>Low</option><option selected>Medium</option><option>High</option></select>
+      </div>
+      <div class="project-modal-field">
+        <label>Due Date</label>
+        <input type="date" name="due_date">
+      </div>
+      <div class="project-modal-field">
+        <label>Required Skill</label>
+        <select name="required_skill_id">
+          <option value="">— No specific skill —</option>
+          {% if project_requirements %}
+          <optgroup label="Project Required Skills">
+            {% for requirement in project_requirements %}<option value="{{ requirement.skill_id }}">{{ requirement.skill.name }}</option>{% endfor %}
+          </optgroup>
+          {% endif %}
+          <optgroup label="Other Skills">
+            {% for s in skills if s.id not in project_skill_ids %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+          </optgroup>
+        </select>
+        {% if project_requirements %}<small>Project-level required skills are shown first.</small>{% endif %}
+      </div>
+      <div class="project-modal-field">
+        <label>Required Proficiency</label>
+        <select name="required_level">
+          <option value="1">Level 1 - Beginner</option>
+          <option value="2">Level 2 - Basic</option>
+          <option value="3" selected>Level 3 - Intermediate</option>
+          <option value="4">Level 4 - Advanced</option>
+          <option value="5">Level 5 - Expert</option>
+        </select>
+      </div>
+    </div>
+    <div class="project-modal-actions">
+      <button class="btn secondary" type="button" onclick="this.closest('dialog').close()">Cancel</button>
+      <button class="btn primary" type="submit">Add Task</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="project-modal" id="milestoneCreateDialog">
+  <form class="project-modal-card milestone-modal-form" method="POST" action="{{ url_for('projects.create_milestone', project_id=project.id) }}">
+    <div class="project-modal-head">
+      <div><span class="project-modal-kicker">Project Checkpoint</span><h3>Add Milestone</h3></div>
+      <button class="project-modal-close" type="button" aria-label="Close" onclick="this.closest('dialog').close()">×</button>
+    </div>
+    <p class="project-modal-copy">Add a project checkpoint and due date for dashboard deadline monitoring.</p>
+    <div class="project-modal-grid">
+      <div class="project-modal-field full">
+        <label>Milestone Title</label>
+        <input type="text" name="title" placeholder="e.g. UAT sign-off" required>
+      </div>
+      <div class="project-modal-field full">
+        <label>Due Date</label>
+        <input type="date" name="due_date">
+      </div>
+    </div>
+    <div class="project-modal-actions">
+      <button class="btn secondary" type="button" onclick="this.closest('dialog').close()">Cancel</button>
+      <button class="btn primary" type="submit">Add Milestone</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
 {% endblock %}

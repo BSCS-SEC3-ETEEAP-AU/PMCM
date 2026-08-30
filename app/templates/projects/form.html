@@ -76,7 +76,7 @@
   <fieldset class="project-team-fieldset">
     <legend>Team Members</legend>
     {% if editing %}
-    <p class="muted form-help">Only project members can be selected as task assignees.</p>
+    <p class="muted form-help">Current team members stay selected even if they are now unavailable or at capacity. Capacity rules apply only when adding a new member, and skill alignment updates as project requirements change.</p>
     {% else %}
     <p class="muted form-help">Active-account team members are shown for workforce visibility. Available employees with remaining capacity can be selected and are ranked by skill alignment when project requirements are defined. Unavailable and at-capacity employees remain at the bottom.</p>
     {% endif %}
@@ -99,18 +99,21 @@
     <div class="member-select-grid">
       {% for e in employees %}
       {% set account_active = e.id in active_account_employee_ids if active_account_employee_ids is defined else true %}
+      {% set current_member = editing and e.id in selected_member_ids %}
       {% set capacity = employee_capacity.get(e.id) if employee_capacity is defined else none %}
       {% set availability = capacity.availability_status if capacity else 'Available' %}
       {% set at_capacity = capacity.at_capacity if capacity else false %}
       {% set eligible = capacity.is_available if capacity else true %}
+      {% set selectable = current_member or eligible %}
       <div
-        class="member-select-card {% if not eligible %}is-disabled{% endif %} {% if availability == 'Unavailable' %}is-unavailable{% elif at_capacity %}is-at-capacity{% else %}is-available{% endif %}"
+        class="member-select-card {% if current_member %}is-current-member{% endif %} {% if not selectable %}is-disabled{% endif %} {% if availability == 'Unavailable' %}is-unavailable{% elif at_capacity %}is-at-capacity{% else %}is-available{% endif %}"
         id="memberCard-{{ e.id }}"
         data-employee-id="{{ e.id }}"
         data-employee-name="{{ e.full_name|lower }}"
         data-position="{{ e.position or '' }}"
         data-department="{{ e.team or '' }}"
         data-eligible="{{ '1' if eligible else '0' }}"
+        data-current-member="{{ '1' if current_member else '0' }}"
       >
         <div class="member-select-heading">
           <label class="member-select-choice" for="member-{{ e.id }}">
@@ -120,19 +123,20 @@
               name="members"
               value="{{ e.id }}"
               {% if e.id in selected_member_ids %}checked{% endif %}
-              {% if (not editing and not eligible) or (editing and not account_active) %}disabled{% endif %}
+              {% if (not selectable) or (editing and not account_active) %}disabled{% endif %}
             >
             {% if editing and not account_active and e.id in selected_member_ids %}<input type="hidden" name="members" value="{{ e.id }}">{% endif %}
             <div class="member-select-identity">
               <div class="member-name-line">
                 <strong>{{ e.full_name }}</strong>
                 <span class="member-position-title">{{ e.position or 'Position not set' }}</span>
+                {% if current_member %}<span class="member-current-badge">Current Team</span>{% endif %}
                 {% if editing and not account_active %}<span class="member-position-title">Account Disabled · historical member</span>{% endif %}
               </div>
               <span class="member-team-name">{{ e.team or 'Department / team not assigned' }}</span>
             </div>
           </label>
-          {% if not editing and capacity %}
+          {% if capacity and account_active %}
           <button
             class="member-capacity-edit"
             type="button"
@@ -164,7 +168,6 @@
           </div>
         </div>
         {% endif %}
-        {% if not editing %}
         <div class="member-skill-alignment" data-alignment-employee="{{ e.id }}">
           <div class="member-alignment-head">
             <div>
@@ -176,7 +179,6 @@
           <p class="member-alignment-summary">Add at least one required project skill to compare this employee's recorded proficiency.</p>
           <div class="member-alignment-skill-list"></div>
         </div>
-        {% endif %}
       </div>
       {% else %}
       <div class="empty-state member-select-empty">No employee profiles are available.</div>
@@ -284,7 +286,6 @@
   </div>
 </dialog>
 
-{% if not editing %}
 <dialog class="capacity-editor" id="capacityEditor">
   <div class="capacity-editor-head">
     <div>
@@ -316,7 +317,6 @@
     <button type="button" class="btn primary" id="capacityEditorSave">Save Capacity</button>
   </div>
 </dialog>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -495,7 +495,6 @@
   });
 })();
 </script>
-{% if not editing %}
 <script>
 (() => {
   const requirementsList = document.getElementById('projectRequirementsList');
@@ -531,11 +530,15 @@
     const cards = Array.from(memberGrid.querySelectorAll('.member-select-card'));
     const hasRequirements = requirements.length > 0;
     cards.sort((a, b) => {
+      const currentA = Number(a.dataset.currentMember || 0);
+      const currentB = Number(b.dataset.currentMember || 0);
+      if (currentA !== currentB) return currentB - currentA;
+
       const eligibleA = Number(a.dataset.eligible || 0);
       const eligibleB = Number(b.dataset.eligible || 0);
       if (eligibleA !== eligibleB) return eligibleB - eligibleA;
 
-      if (eligibleA === 1 && hasRequirements) {
+      if ((eligibleA === 1 || currentA === 1) && hasRequirements) {
         const scoreA = Number(a.dataset.alignmentScore ?? -1);
         const scoreB = Number(b.dataset.alignmentScore ?? -1);
         if (scoreA !== scoreB) return scoreB - scoreA;
@@ -728,12 +731,13 @@
 
       const card = document.getElementById(`memberCard-${data.employee_id}`);
       const checkbox = card.querySelector('input[name="members"]');
-      card.classList.toggle('is-disabled', !data.is_available);
+      const currentMember = card.dataset.currentMember === '1';
+      card.classList.toggle('is-disabled', !data.is_available && !currentMember);
       card.classList.toggle('is-unavailable', data.availability_status === 'Unavailable');
       card.classList.toggle('is-at-capacity', data.availability_status === 'Available' && data.at_capacity);
       card.classList.toggle('is-available', data.is_available);
-      checkbox.disabled = !data.is_available;
-      if (!data.is_available) checkbox.checked = false;
+      checkbox.disabled = !data.is_available && !currentMember;
+      if (!data.is_available && !currentMember) checkbox.checked = false;
       card.dataset.eligible = data.is_available ? '1' : '0';
 
       card.querySelector('.capacity-active').textContent = `${data.active_projects}/${data.project_capacity}`;
@@ -758,5 +762,4 @@
   });
 })();
 </script>
-{% endif %}
 {% endblock %}

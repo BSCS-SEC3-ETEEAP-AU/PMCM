@@ -120,6 +120,7 @@ class Project(db.Model):
     priority = db.Column(db.String(20), default="Medium")  # Low | Medium | High
     start_date = db.Column(db.Date)
     target_date = db.Column(db.Date)
+    completed_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     manager = db.relationship("User", backref="managed_projects")
@@ -200,6 +201,8 @@ class Task(db.Model):
     required_skill_id = db.Column(db.Integer, db.ForeignKey("skills.id"), nullable=True)
     required_level = db.Column(db.Integer, default=3)
     due_date = db.Column(db.Date)
+    started_at = db.Column(db.DateTime)
+    completed_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -246,6 +249,34 @@ class Milestone(db.Model):
     due_date = db.Column(db.Date)
     achieved = db.Column(db.Boolean, default=False)
 
+    @property
+    def deadline_state(self):
+        """Return milestone state for project-detail status styling."""
+        if self.achieved:
+            return "completed"
+        if not self.due_date:
+            return "no-deadline"
+        days_remaining = (self.due_date - date.today()).days
+        if days_remaining < 0:
+            return "overdue"
+        if days_remaining == 0:
+            return "due-today"
+        if days_remaining <= 3:
+            return "due-soon"
+        return "upcoming"
+
+    @property
+    def deadline_label(self):
+        labels = {
+            "completed": "Completed",
+            "no-deadline": "No Due Date",
+            "overdue": "Overdue",
+            "due-today": "Due Today",
+            "due-soon": "Due Soon",
+            "upcoming": "Upcoming",
+        }
+        return labels[self.deadline_state]
+
 
 class LearningResource(db.Model):
     """Learning material in the repository (Recommendation Module)."""
@@ -261,6 +292,7 @@ class LearningResource(db.Model):
     access_type = db.Column(db.String(30))  # Internal | Company Subscription | External
     url = db.Column(db.String(300))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
 
     skill = db.relationship("Skill", backref="learning_resources")
 

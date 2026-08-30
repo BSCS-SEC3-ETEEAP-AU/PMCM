@@ -4,7 +4,7 @@ Supports project creation, task assignment, workflow coordination,
 milestone management, and project progress monitoring (thesis Fig. 5).
 Manager/Admin create projects & tasks; Employees update their task status.
 """
-from datetime import date
+from datetime import date, datetime
 
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
@@ -364,6 +364,7 @@ def create_project():
             priority=priority,
             start_date=_date(request.form.get("start_date")),
             target_date=_date(request.form.get("target_date")),
+            completed_at=datetime.utcnow() if status == "Completed" else None,
         )
         db.session.add(proj)
         db.session.flush()
@@ -390,6 +391,8 @@ def edit_project(project_id):
     project = Project.query.get_or_404(project_id)
     _require_project_manager(project)
     selected_member_ids = _selected_member_ids(project_id)
+    capacity_map = _employee_capacity_map()
+    employee_proficiencies = _employee_proficiency_map()
     active_employees = _active_account_employees()
     active_account_employee_ids = {employee.id for employee in active_employees}
     historical_members = (
@@ -401,6 +404,18 @@ def edit_project(project_id):
         else []
     )
     employees = active_employees + historical_members
+    # Keep current project members first, then employees who can accept a new
+    # assignment, then unavailable/at-capacity employees for manager visibility.
+    employees.sort(key=lambda employee: (
+        employee.id not in selected_member_ids,
+        not capacity_map.get(employee.id, {}).get("is_available", False),
+        employee.full_name.lower(),
+    ))
+    eligible_new_member_ids = {
+        employee.id
+        for employee in active_employees
+        if capacity_map.get(employee.id, {}).get("is_available", False)
+    }
     skills = Skill.query.order_by(Skill.name).all()
     valid_skill_ids = {skill.id for skill in skills}
     project_requirements = _saved_project_requirements(project)
@@ -412,12 +427,15 @@ def edit_project(project_id):
         posted_member_ids = {
             int(emp_id) for emp_id in request.form.getlist("members") if emp_id.isdigit()
         }
-        # Existing disabled-account members may remain attached for history, but
-        # only active accounts may be newly added to a project.
-        allowed_member_ids = active_account_employee_ids | selected_member_ids
+        # Current members may remain even if they are now unavailable or at
+        # capacity. Capacity/availability rules apply only to newly added members.
+        allowed_member_ids = eligible_new_member_ids | selected_member_ids
         invalid_member_ids = posted_member_ids - allowed_member_ids
         if invalid_member_ids:
-            flash("Only team members with active login accounts can be added to a project.", "danger")
+            flash(
+                "One or more newly selected employees are unavailable or already at project capacity.",
+                "danger",
+            )
             posted_member_ids &= allowed_member_ids
 
         project_requirements, requirement_error = _parse_project_requirements(
@@ -432,6 +450,8 @@ def edit_project(project_id):
                 selected_member_ids=posted_member_ids,
                 project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
                 active_account_employee_ids=active_account_employee_ids,
+                employee_capacity=capacity_map,
+                employee_proficiencies=employee_proficiencies,
             )
 
         if not name:
@@ -443,6 +463,8 @@ def edit_project(project_id):
                 selected_member_ids=posted_member_ids,
                 project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
                 active_account_employee_ids=active_account_employee_ids,
+                employee_capacity=capacity_map,
+                employee_proficiencies=employee_proficiencies,
             )
         if status not in PROJECT_STATUSES:
             flash("Invalid project status.", "danger")
@@ -453,6 +475,8 @@ def edit_project(project_id):
                 selected_member_ids=posted_member_ids,
                 project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
                 active_account_employee_ids=active_account_employee_ids,
+                employee_capacity=capacity_map,
+                employee_proficiencies=employee_proficiencies,
             )
         if priority not in PROJECT_PRIORITIES:
             flash("Invalid project priority.", "danger")
@@ -463,11 +487,15 @@ def edit_project(project_id):
                 selected_member_ids=posted_member_ids,
                 project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
                 active_account_employee_ids=active_account_employee_ids,
+                employee_capacity=capacity_map,
+                employee_proficiencies=employee_proficiencies,
             )
 
         # Do not remove a member who still owns tasks in this project.
         assigned_employee_ids = {
-            task.assignee_id for task in project.tasks if task.assignee_id is not None
+            task.assignee_id
+            for task in project.tasks
+            if task.assignee_id is not None and task.status != "Done"
         }
         blocked_removals = assigned_employee_ids - posted_member_ids
         if blocked_removals:
@@ -487,14 +515,21 @@ def edit_project(project_id):
                 selected_member_ids=posted_member_ids,
                 project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
                 active_account_employee_ids=active_account_employee_ids,
+                employee_capacity=capacity_map,
+                employee_proficiencies=employee_proficiencies,
             )
 
+        previous_status = project.status
         project.name = name
         project.description = request.form.get("description", "")
         project.status = status
         project.priority = priority
         project.start_date = _date(request.form.get("start_date"))
         project.target_date = _date(request.form.get("target_date"))
+        if status == "Completed" and previous_status != "Completed":
+            project.completed_at = datetime.utcnow()
+        elif status != "Completed" and previous_status == "Completed":
+            project.completed_at = None
 
         existing_links = ProjectMember.query.filter_by(project_id=project_id).all()
         existing_ids = {link.employee_id for link in existing_links}
@@ -516,6 +551,8 @@ def edit_project(project_id):
         selected_member_ids=selected_member_ids,
         project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
         active_account_employee_ids=active_account_employee_ids,
+        employee_capacity=capacity_map,
+        employee_proficiencies=employee_proficiencies,
     )
 
 
@@ -543,6 +580,7 @@ def detail(project_id):
         db.session.query(Employee)
         .join(ProjectMember, ProjectMember.employee_id == Employee.id)
         .filter(ProjectMember.project_id == project_id)
+        .order_by(Employee.full_name)
         .all()
     )
     assignable_members = (
@@ -558,6 +596,7 @@ def detail(project_id):
     project_requirements = sorted(
         project.skill_requirements, key=lambda requirement: requirement.skill.name.lower()
     )
+    project_skill_ids = {requirement.skill_id for requirement in project_requirements}
 
     total = len(tasks)
     done = sum(1 for t in tasks if t.status == "Done")
@@ -568,7 +607,7 @@ def detail(project_id):
         "projects/detail.html",
         project=project, tasks=tasks, members=members,
         milestones=milestones, skills=skills, employees=assignable_members,
-        project_requirements=project_requirements,
+        project_requirements=project_requirements, project_skill_ids=project_skill_ids,
         progress=progress, statuses=TASK_STATUSES,
         can_manage_project=can_manage_project,
     )
@@ -608,6 +647,9 @@ def create_task(project_id):
         flash("Invalid task priority.", "danger")
         return redirect(url_for("projects.detail", project_id=project_id))
 
+    now = datetime.utcnow()
+    started_at = now if status in ("In Progress", "In Review", "Done") else None
+    completed_at = now if status == "Done" else None
     task = Task(
         project_id=project_id,
         title=title,
@@ -618,6 +660,8 @@ def create_task(project_id):
         required_skill_id=int(request.form.get("required_skill_id") or 0) or None,
         required_level=int(request.form.get("required_level") or 3),
         due_date=_date(request.form.get("due_date")),
+        started_at=started_at,
+        completed_at=completed_at,
     )
     db.session.add(task)
     db.session.commit()
@@ -645,8 +689,21 @@ def update_task(task_id):
         flash("Invalid task status.", "danger")
         return redirect(url_for("projects.detail", project_id=task.project_id))
 
+    previous_status = task.status
+    now = datetime.utcnow()
+    if new_status in ("In Progress", "In Review") and task.started_at is None:
+        task.started_at = now
+    if new_status == "Done":
+        if task.started_at is None:
+            task.started_at = task.created_at or now
+        if previous_status != "Done" or task.completed_at is None:
+            task.completed_at = now
+    elif previous_status == "Done":
+        # A reopened task should no longer count as completed until it reaches Done again.
+        task.completed_at = None
+
     task.status = new_status
-    task.updated_at = db.func.now()
+    task.updated_at = now
     db.session.commit()
     flash(f"Task '{task.title}' → {new_status}.", "success")
     return redirect(url_for("projects.detail", project_id=task.project_id))

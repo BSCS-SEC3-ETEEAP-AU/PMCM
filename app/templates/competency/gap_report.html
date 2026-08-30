@@ -3,26 +3,110 @@
 {% block page_title %}Competency Gap Analysis{% endblock %}
 {% block page_subtitle %}Review current proficiency against active project/task requirements{% endblock %}
 {% block content %}
-<div class="module-toolbar">
-  <div></div>
-  <div class="module-toolbar-actions">
+{% set level_names = {1: 'Beginner', 2: 'Basic', 3: 'Intermediate', 4: 'Advanced', 5: 'Expert'} %}
+{% set ns = namespace(open=0, met=0, pending=0) %}
+{% for r in rows %}
+  {% if r.gap is none %}
+    {% set ns.pending = ns.pending + 1 %}
+  {% elif r.gap > 0 %}
+    {% set ns.open = ns.open + 1 %}
+  {% else %}
+    {% set ns.met = ns.met + 1 %}
+  {% endif %}
+{% endfor %}
+
+<div class="gap-analysis-toolbar">
+  <div class="gap-analysis-intro">
+    <span class="gap-analysis-intro-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="4"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
+    </span>
+    <div>
+      <strong>Project-driven competency view</strong>
+      <p>Targets come from active assigned project tasks. Employees without a recorded proficiency remain pending assessment and are not yet included in learning recommendations.</p>
+    </div>
+  </div>
+  <div class="module-toolbar-actions gap-analysis-actions">
     <a class="btn secondary" href="{{ url_for('competency.my_profile') }}">My Competencies</a>
     <a class="btn secondary" href="{{ url_for('competency.overview') }}">Team Competencies</a>
     <a class="btn secondary" href="{{ url_for('competency.list_skills') }}">Skills Catalog</a>
   </div>
 </div>
-<p class="muted">Targets come from active assigned project tasks. Employees without a recorded proficiency remain pending assessment and do not receive learning recommendations yet.</p>
-<table class="data-table">
-  <thead><tr><th>Employee</th><th>Team</th><th>Skill</th><th>Current</th><th>Project Target</th><th>Gap</th><th>Required By</th></tr></thead>
-  <tbody>
-  {% for r in rows %}
-    <tr>
-      <td>{{ r.employee }}</td><td>{{ r.team }}</td><td>{{ r.skill }}</td>
-      <td>{% if r.current is none %}<span class="status-pill status-not-started">Not Assessed</span>{% else %}Level {{ r.current }}{% endif %}</td><td><strong>Level {{ r.required }}</strong></td>
-      <td>{% if r.gap is none %}<span class="muted">Pending</span>{% elif r.gap > 0 %}<span class="gap-badge">{{ r.gap }}</span>{% else %}<span class="gap-badge gap-zero">0</span>{% endif %}</td>
-      <td>{{ r.projects|join(', ') }}</td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
+
+<div class="gap-summary-grid">
+  <div class="gap-summary-card gap-summary-total">
+    <span class="gap-summary-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+    </span>
+    <div><span>Requirements Reviewed</span><strong>{{ rows|length }}</strong><small>Active project/task targets</small></div>
+  </div>
+  <div class="gap-summary-card gap-summary-open">
+    <span class="gap-summary-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 2.7 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 2.7a2 2 0 0 0-3.4 0Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
+    </span>
+    <div><span>Open Gaps</span><strong>{{ ns.open }}</strong><small>Needs development</small></div>
+  </div>
+  <div class="gap-summary-card gap-summary-met">
+    <span class="gap-summary-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16 9"></path></svg>
+    </span>
+    <div><span>Meets Target</span><strong>{{ ns.met }}</strong><small>No proficiency gap</small></div>
+  </div>
+  <div class="gap-summary-card gap-summary-pending">
+    <span class="gap-summary-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+    </span>
+    <div><span>Pending Assessment</span><strong>{{ ns.pending }}</strong><small>No recorded proficiency yet</small></div>
+  </div>
+</div>
+
+<section class="gap-results-panel">
+  <div class="gap-results-head">
+    <div>
+      <h2>Competency Requirements</h2>
+      <p>Compare each employee's current proficiency with the level required by active project work.</p>
+    </div>
+    <span class="gap-record-count">{{ rows|length }} record{% if rows|length != 1 %}s{% endif %}</span>
+  </div>
+
+  <div class="gap-table-wrap">
+    <table class="data-table gap-analysis-table">
+      <thead>
+        <tr><th>Employee</th><th>Team</th><th>Skill</th><th>Current</th><th>Project Target</th><th>Gap Status</th><th>Required By</th></tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr class="{% if r.gap is none %}gap-row-pending{% elif r.gap > 0 %}gap-row-open{% else %}gap-row-met{% endif %}">
+          <td><span class="gap-employee-name">{{ r.employee }}</span></td>
+          <td><span class="gap-team-name">{{ r.team }}</span></td>
+          <td><span class="gap-skill-name">{{ r.skill }}</span></td>
+          <td>
+            {% if r.current is none %}
+              <span class="gap-level-chip gap-level-pending">Not Assessed</span>
+            {% else %}
+              <span class="gap-level-chip"><strong>Level {{ r.current }}</strong><small>{{ level_names.get(r.current, '') }}</small></span>
+            {% endif %}
+          </td>
+          <td><span class="gap-level-chip gap-level-target"><strong>Level {{ r.required }}</strong><small>{{ level_names.get(r.required, '') }}</small></span></td>
+          <td>
+            {% if r.gap is none %}
+              <span class="gap-status-chip gap-status-pending"><span class="gap-status-dot"></span>Pending Assessment</span>
+            {% elif r.gap > 0 %}
+              <span class="gap-status-stack"><span class="gap-status-chip gap-status-open"><span class="gap-status-dot"></span>Needs Development</span><small>Gap {{ r.gap }} level{% if r.gap != 1 %}s{% endif %}</small></span>
+            {% else %}
+              <span class="gap-status-chip gap-status-met"><span class="gap-status-dot"></span>Meets Target</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="gap-project-list">
+              {% for project in r.projects %}<span class="gap-project-chip">{{ project }}</span>{% endfor %}
+            </div>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7"><div class="gap-empty-state">No active competency requirements match the current data.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
 {% endblock %}

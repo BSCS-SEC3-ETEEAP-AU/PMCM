@@ -4,7 +4,7 @@
 {% block content %}
 <section class="module-toolbar">
   <div class="module-search-wrap">
-    <span class="module-search-icon">⌕</span>
+    <span class="module-search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg></span>
     <input id="projectSearch" class="module-search" type="search" placeholder="Search projects..." aria-label="Search projects">
   </div>
   {% if current_user.role in ('admin','manager') %}
@@ -12,25 +12,25 @@
   {% endif %}
 </section>
 
-<section class="module-kpi-row module-kpi-five" aria-label="Project summary">
+<section class="module-kpi-row module-kpi-five projects-kpi-row" aria-label="Project summary">
   <article class="module-kpi-card mk-green">
-    <span class="module-kpi-icon">▣</span>
+    <span class="module-kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H10l1.6 2H17.5A2.5 2.5 0 0 1 20 8.5v9A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5v-11Z"/><path d="M8 11h8M8 15h5"/></svg></span>
     <div><span class="module-kpi-label">Total Projects</span><strong>{{ project_summary.total }}</strong></div>
   </article>
   <article class="module-kpi-card mk-blue">
-    <span class="module-kpi-icon">▤</span>
+    <span class="module-kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span>
     <div><span class="module-kpi-label">Active</span><strong>{{ project_summary.active }}</strong></div>
   </article>
   <article class="module-kpi-card mk-violet">
-    <span class="module-kpi-icon">✓</span>
+    <span class="module-kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16.5 8.5"/></svg></span>
     <div><span class="module-kpi-label">Completed</span><strong>{{ project_summary.completed }}</strong></div>
   </article>
   <article class="module-kpi-card mk-amber">
-    <span class="module-kpi-icon">Ⅱ</span>
+    <span class="module-kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5v7M14.5 8.5v7"/></svg></span>
     <div><span class="module-kpi-label">On Hold</span><strong>{{ project_summary.on_hold }}</strong></div>
   </article>
   <article class="module-kpi-card mk-teal">
-    <span class="module-kpi-icon">◔</span>
+    <span class="module-kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3a9 9 0 1 0 9 9h-9V3Z"/><path d="M15 3.5A8.5 8.5 0 0 1 20.5 9H15V3.5Z"/></svg></span>
     <div><span class="module-kpi-label">Avg. Progress</span><strong>{{ project_summary.avg_progress }}%</strong></div>
   </article>
 </section>

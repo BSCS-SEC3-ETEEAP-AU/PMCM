@@ -5,7 +5,7 @@ as described in the thesis (Chapter 1, Background of the Study).
 
 Run:  python3.11 seed.py
 """
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from app import create_app
 from app.models import (
     db, User, Employee, Skill, Certification, CompetencyAssessment,
@@ -166,11 +166,16 @@ with app.app_context():
         (p2, "Build notification service", 1, "To Do", "Medium", "Python", 4),
         (p2, "Dashboard analytics view", 4, "Backlog", "Low", "Data Visualization", 4),
     ]
-    for proj, title, eidx, status, prio, sk, req in task_defs:
+    for task_index, (proj, title, eidx, status, prio, sk, req) in enumerate(task_defs):
+        created_at = datetime.utcnow() - timedelta(days=14 - task_index)
+        started_at = created_at + timedelta(days=1) if status in ("In Progress", "In Review", "Done") else None
+        completed_at = started_at + timedelta(days=2 + (task_index % 3)) if status == "Done" else None
         db.session.add(Task(
             project_id=proj.id, title=title, assignee_id=employees[eidx].id,
             status=status, priority=prio, required_skill_id=skills[sk].id,
             required_level=req, due_date=date.today() + timedelta(days=20),
+            created_at=created_at, started_at=started_at, completed_at=completed_at,
+            updated_at=completed_at or started_at or created_at,
         ))
     db.session.commit()
 
