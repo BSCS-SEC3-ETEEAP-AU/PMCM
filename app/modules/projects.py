@@ -8,7 +8,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from ..models import (
     db, Project, Task, Employee, ProjectMember, ProjectSkillRequirement,
-    Milestone, Skill, User,
+    Milestone, Skill, User, CompetencyAssessment,
 )
 from ..decorators import manager_required
 
@@ -77,6 +77,27 @@ def _available_employees(capacity_map):
         for employee in Employee.query.order_by(Employee.full_name).all()
         if capacity_map.get(employee.id, {}).get("is_available")
     ]
+
+
+def _employee_proficiency_map():
+    """Return each employee's latest recorded current proficiency by skill."""
+    proficiency_map = {}
+    assessments = CompetencyAssessment.query.order_by(
+        CompetencyAssessment.employee_id,
+        CompetencyAssessment.skill_id,
+        CompetencyAssessment.assessed_on,
+        CompetencyAssessment.created_at,
+        CompetencyAssessment.id,
+    ).all()
+
+    # Ordered oldest-to-newest so a later assessment replaces an earlier one.
+    for assessment in assessments:
+        if assessment.current_level not in range(1, 6):
+            continue
+        proficiency_map.setdefault(assessment.employee_id, {})[assessment.skill_id] = (
+            assessment.current_level
+        )
+    return proficiency_map
 
 
 def _parse_project_requirements(valid_skill_ids):
@@ -220,6 +241,7 @@ def list_projects():
 @manager_required
 def create_project():
     capacity_map = _employee_capacity_map()
+    employee_proficiencies = _employee_proficiency_map()
     skills = Skill.query.order_by(Skill.name).all()
     valid_skill_ids = {skill.id for skill in skills}
     project_requirements = []
@@ -259,6 +281,7 @@ def create_project():
                 project_requirements=project_requirements,
                 selected_member_ids=selected_member_ids,
                 project_statuses=PROJECT_STATUSES, employee_capacity=capacity_map,
+                employee_proficiencies=employee_proficiencies,
             )
 
         invalid_member_ids = selected_member_ids - available_employee_ids
@@ -275,6 +298,7 @@ def create_project():
                 project_requirements=project_requirements,
                 selected_member_ids=selected_member_ids,
                 project_statuses=PROJECT_STATUSES, employee_capacity=capacity_map,
+                employee_proficiencies=employee_proficiencies,
             )
         if not name:
             flash("Project name is required.", "danger")
@@ -284,6 +308,7 @@ def create_project():
                 project_requirements=project_requirements,
                 selected_member_ids=selected_member_ids,
                 project_statuses=PROJECT_STATUSES, employee_capacity=capacity_map,
+                employee_proficiencies=employee_proficiencies,
             )
         if status not in PROJECT_STATUSES:
             flash("Invalid project status.", "danger")
@@ -293,6 +318,7 @@ def create_project():
                 project_requirements=project_requirements,
                 selected_member_ids=selected_member_ids,
                 project_statuses=PROJECT_STATUSES, employee_capacity=capacity_map,
+                employee_proficiencies=employee_proficiencies,
             )
 
         proj = Project(
@@ -318,6 +344,7 @@ def create_project():
         project_requirements=project_requirements,
         selected_member_ids=selected_member_ids,
         project_statuses=PROJECT_STATUSES, employee_capacity=capacity_map,
+        employee_proficiencies=employee_proficiencies,
     )
 
 

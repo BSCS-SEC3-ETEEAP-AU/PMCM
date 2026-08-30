@@ -67,8 +67,24 @@
     {% if editing %}
     <p class="muted form-help">Only project members can be selected as task assignees.</p>
     {% else %}
-    <p class="muted form-help">All employees are shown for workforce visibility. Only employees marked <strong>Available</strong> with remaining project capacity can be selected.</p>
+    <p class="muted form-help">All employees are shown for workforce visibility. Available employees with remaining capacity can be selected and are ranked by skill alignment when project requirements are defined. Unavailable and at-capacity employees remain at the bottom.</p>
     {% endif %}
+    <div class="member-filter-bar" aria-label="Team member filters">
+      <div class="member-filter-group">
+        <label for="memberPositionFilter">Position</label>
+        <select id="memberPositionFilter">
+          <option value="">All Positions</option>
+        </select>
+      </div>
+      <div class="member-filter-group">
+        <label for="memberDepartmentFilter">Department / Team</label>
+        <select id="memberDepartmentFilter">
+          <option value="">All Departments</option>
+        </select>
+      </div>
+      <button class="btn small secondary member-filter-reset" id="memberFilterReset" type="button">Clear Filters</button>
+      <span class="member-filter-count" id="memberFilterCount" aria-live="polite"></span>
+    </div>
     <div class="member-select-grid">
       {% for e in employees %}
       {% set capacity = employee_capacity.get(e.id) if employee_capacity is defined else none %}
@@ -80,6 +96,8 @@
         id="memberCard-{{ e.id }}"
         data-employee-id="{{ e.id }}"
         data-employee-name="{{ e.full_name|lower }}"
+        data-position="{{ e.position or '' }}"
+        data-department="{{ e.team or '' }}"
         data-eligible="{{ '1' if eligible else '0' }}"
       >
         <div class="member-select-heading">
@@ -132,12 +150,84 @@
           </div>
         </div>
         {% endif %}
+        {% if not editing %}
+        <div class="member-skill-alignment" data-alignment-employee="{{ e.id }}">
+          <div class="member-alignment-head">
+            <div>
+              <span class="member-alignment-kicker">Project Skill Alignment</span>
+              <strong class="member-alignment-status is-neutral">Not Evaluated</strong>
+            </div>
+            <strong class="member-alignment-score">—</strong>
+          </div>
+          <p class="member-alignment-summary">Add at least one required project skill to compare this employee's recorded proficiency.</p>
+          <div class="member-alignment-skill-list"></div>
+        </div>
+        {% endif %}
       </div>
       {% else %}
       <div class="empty-state member-select-empty">No employee profiles are available.</div>
       {% endfor %}
     </div>
   </fieldset>
+  <script>
+  (() => {
+    const grid = document.querySelector('.member-select-grid');
+    const positionFilter = document.getElementById('memberPositionFilter');
+    const departmentFilter = document.getElementById('memberDepartmentFilter');
+    const resetButton = document.getElementById('memberFilterReset');
+    const countEl = document.getElementById('memberFilterCount');
+    if (!grid || !positionFilter || !departmentFilter) return;
+
+    const cards = () => Array.from(grid.querySelectorAll('.member-select-card'));
+    const normalize = value => String(value || '').trim().toLocaleLowerCase();
+
+    const populateFilter = (select, datasetKey) => {
+      const values = new Map();
+      cards().forEach(card => {
+        const displayValue = String(card.dataset[datasetKey] || '').trim();
+        if (!displayValue) return;
+        const key = normalize(displayValue);
+        if (!values.has(key)) values.set(key, displayValue);
+      });
+      Array.from(values.entries())
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .forEach(([key, label]) => {
+          const option = document.createElement('option');
+          option.value = key;
+          option.textContent = label;
+          select.appendChild(option);
+        });
+    };
+
+    const applyFilters = () => {
+      const selectedPosition = positionFilter.value;
+      const selectedDepartment = departmentFilter.value;
+      let visible = 0;
+      const allCards = cards();
+
+      allCards.forEach(card => {
+        const matchesPosition = !selectedPosition || normalize(card.dataset.position) === selectedPosition;
+        const matchesDepartment = !selectedDepartment || normalize(card.dataset.department) === selectedDepartment;
+        const matches = matchesPosition && matchesDepartment;
+        card.hidden = !matches;
+        if (matches) visible += 1;
+      });
+
+      if (countEl) countEl.textContent = `Showing ${visible} of ${allCards.length} employees`;
+    };
+
+    populateFilter(positionFilter, 'position');
+    populateFilter(departmentFilter, 'department');
+    positionFilter.addEventListener('change', applyFilters);
+    departmentFilter.addEventListener('change', applyFilters);
+    resetButton?.addEventListener('click', () => {
+      positionFilter.value = '';
+      departmentFilter.value = '';
+      applyFilters();
+    });
+    applyFilters();
+  })();
+  </script>
   <div class="form-actions">
     {% if editing %}
     <a class="btn secondary" href="{{ url_for('projects.detail', project_id=project.id) }}">Cancel</a>
@@ -302,6 +392,7 @@
     }
     if (target) {
       target.value = value;
+      target.dispatchEvent(new Event('change', { bubbles: true }));
       target.focus();
     }
     return true;
@@ -393,6 +484,145 @@
 {% if not editing %}
 <script>
 (() => {
+  const requirementsList = document.getElementById('projectRequirementsList');
+  const memberGrid = document.querySelector('.member-select-grid');
+  if (!requirementsList || !memberGrid) return;
+
+  const proficiencyMap = {{ employee_proficiencies|default({})|tojson }};
+  const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+  })[character]);
+
+  const collectRequirements = () => {
+    const requirements = [];
+    const seen = new Set();
+    requirementsList.querySelectorAll('.project-requirement-row').forEach(row => {
+      const skillSelect = row.querySelector('select[name="requirement_skill_id"]');
+      const levelSelect = row.querySelector('select[name="requirement_level"]');
+      const skillId = Number(skillSelect?.value || 0);
+      const requiredLevel = Number(levelSelect?.value || 0);
+      if (!skillId || !requiredLevel || seen.has(skillId)) return;
+      seen.add(skillId);
+      const optionText = skillSelect.options[skillSelect.selectedIndex]?.text || `Skill ${skillId}`;
+      requirements.push({
+        skillId,
+        requiredLevel,
+        skillName: optionText.split(' · ')[0]
+      });
+    });
+    return requirements;
+  };
+
+  const sortMemberCards = requirements => {
+    const cards = Array.from(memberGrid.querySelectorAll('.member-select-card'));
+    const hasRequirements = requirements.length > 0;
+    cards.sort((a, b) => {
+      const eligibleA = Number(a.dataset.eligible || 0);
+      const eligibleB = Number(b.dataset.eligible || 0);
+      if (eligibleA !== eligibleB) return eligibleB - eligibleA;
+
+      if (eligibleA === 1 && hasRequirements) {
+        const scoreA = Number(a.dataset.alignmentScore ?? -1);
+        const scoreB = Number(b.dataset.alignmentScore ?? -1);
+        if (scoreA !== scoreB) return scoreB - scoreA;
+      }
+      return (a.dataset.employeeName || '').localeCompare(b.dataset.employeeName || '');
+    });
+    cards.forEach(card => memberGrid.appendChild(card));
+  };
+
+  window.sortProjectMemberCards = () => sortMemberCards(collectRequirements());
+
+  const renderAlignment = (card, requirements) => {
+    const employeeId = String(card.dataset.employeeId);
+    const proficiencies = proficiencyMap[employeeId] || {};
+    const box = card.querySelector('.member-skill-alignment');
+    if (!box) return;
+
+    const scoreEl = box.querySelector('.member-alignment-score');
+    const statusEl = box.querySelector('.member-alignment-status');
+    const summaryEl = box.querySelector('.member-alignment-summary');
+    const listEl = box.querySelector('.member-alignment-skill-list');
+    statusEl.className = 'member-alignment-status';
+    listEl.innerHTML = '';
+
+    if (!requirements.length) {
+      card.dataset.alignmentScore = '-1';
+      scoreEl.textContent = '—';
+      statusEl.textContent = 'Not Evaluated';
+      statusEl.classList.add('is-neutral');
+      summaryEl.textContent = "Add at least one required project skill to compare this employee's recorded proficiency.";
+      return;
+    }
+
+    let met = 0;
+    let assessed = 0;
+    const detailRows = [];
+
+    requirements.forEach(requirement => {
+      const rawCurrent = proficiencies[String(requirement.skillId)] ?? proficiencies[requirement.skillId];
+      const currentLevel = Number(rawCurrent || 0);
+      const hasAssessment = currentLevel >= 1 && currentLevel <= 5;
+      const meetsRequirement = hasAssessment && currentLevel >= requirement.requiredLevel;
+      if (hasAssessment) assessed += 1;
+      if (meetsRequirement) met += 1;
+
+      detailRows.push(`
+        <div class="member-alignment-skill-row ${meetsRequirement ? 'is-met' : hasAssessment ? 'is-gap' : 'is-unassessed'}">
+          <span class="member-alignment-skill-name">${escapeHtml(requirement.skillName)}</span>
+          <span class="member-alignment-levels">${hasAssessment ? `L${currentLevel}` : 'Not assessed'} / L${requirement.requiredLevel}${meetsRequirement ? ' ✓' : hasAssessment ? ` · Gap ${requirement.requiredLevel - currentLevel}` : ''}</span>
+        </div>
+      `);
+    });
+
+    const total = requirements.length;
+    const unassessed = total - assessed;
+    if (assessed === 0) {
+      card.dataset.alignmentScore = '-1';
+      scoreEl.textContent = '—';
+      statusEl.textContent = 'Not Assessed';
+      statusEl.classList.add('is-unassessed');
+      summaryEl.textContent = `No recorded proficiency for the ${total} required skill${total === 1 ? '' : 's'}.`;
+    } else {
+      const score = Math.round((met / total) * 100);
+      card.dataset.alignmentScore = String(score);
+      scoreEl.textContent = `${score}%`;
+      if (score === 100) {
+        statusEl.textContent = 'Strong Match';
+        statusEl.classList.add('is-strong');
+      } else if (score >= 50) {
+        statusEl.textContent = 'Partial Match';
+        statusEl.classList.add('is-partial');
+      } else {
+        statusEl.textContent = 'Significant Gap';
+        statusEl.classList.add('is-gap');
+      }
+      summaryEl.textContent = `${met} of ${total} requirements met${unassessed ? ` · ${unassessed} not assessed` : ''}.`;
+    }
+
+    listEl.innerHTML = `
+      <div class="member-alignment-skill-header"><span>Skill</span><span>Current / Required</span></div>
+      ${detailRows.join('')}
+    `;
+  };
+
+  const refreshAlignments = () => {
+    const requirements = collectRequirements();
+    memberGrid.querySelectorAll('.member-select-card').forEach(card => renderAlignment(card, requirements));
+    sortMemberCards(requirements);
+  };
+
+  requirementsList.addEventListener('change', event => {
+    if (event.target.matches('select[name="requirement_skill_id"], select[name="requirement_level"]')) {
+      refreshAlignments();
+    }
+  });
+  new MutationObserver(refreshAlignments).observe(requirementsList, { childList: true });
+  refreshAlignments();
+})();
+</script>
+<script>
+(() => {
   const dialog = document.getElementById('capacityEditor');
   if (!dialog) return;
 
@@ -405,6 +635,10 @@
   let activeButton = null;
 
   const resortMemberCards = () => {
+    if (window.sortProjectMemberCards) {
+      window.sortProjectMemberCards();
+      return;
+    }
     const grid = document.querySelector('.member-select-grid');
     if (!grid) return;
     const cards = Array.from(grid.querySelectorAll('.member-select-card'));

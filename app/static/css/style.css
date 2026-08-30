@@ -3618,6 +3618,60 @@ a.module-kpi-card:hover {
 }
 
 /* ---------- Project team member selection ---------- */
+.member-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.8fr) minmax(190px, 1fr) auto auto;
+  align-items: end;
+  gap: 10px;
+  margin: 10px 0 12px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.member-filter-group {
+  display: grid;
+  gap: 5px;
+}
+
+.member-filter-group label {
+  margin: 0;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.form-card .member-filter-group select {
+  min-width: 0;
+  height: 36px;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font-size: 11px;
+}
+
+.member-filter-reset {
+  min-height: 36px;
+  white-space: nowrap;
+}
+
+.member-filter-count {
+  align-self: center;
+  justify-self: end;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.member-select-card[hidden] {
+  display: none !important;
+}
+
 .member-select-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3784,6 +3838,106 @@ a.module-kpi-card:hover {
 .member-capacity-row .status-unavailable { color: #dc2626; }
 .member-capacity-row .status-at-capacity { color: #b45309; }
 
+.member-skill-alignment {
+  margin: 13px 0 0 27px;
+  padding-top: 12px;
+  border-top: 1px solid #edf2f7;
+}
+
+.member-alignment-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.member-alignment-head > div {
+  display: grid;
+  gap: 3px;
+}
+
+.member-alignment-kicker {
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.member-alignment-status {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.member-alignment-status.is-neutral,
+.member-alignment-status.is-unassessed { color: #64748b; }
+.member-alignment-status.is-strong { color: #047857; }
+.member-alignment-status.is-partial { color: #b45309; }
+.member-alignment-status.is-gap { color: #dc2626; }
+
+.member-alignment-score {
+  color: #0f766e;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.member-alignment-summary {
+  margin: 7px 0 0;
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.member-alignment-skill-list {
+  display: grid;
+  gap: 0;
+  margin-top: 10px;
+  border: 1px solid #e5eaf1;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.member-alignment-skill-header,
+.member-alignment-skill-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+}
+
+.member-alignment-skill-header {
+  background: #f8fafc;
+  color: #94a3b8;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.member-alignment-skill-row {
+  border-top: 1px solid #edf2f7;
+  font-size: 10px;
+}
+
+.member-alignment-skill-name {
+  overflow: hidden;
+  color: #334155;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-alignment-levels {
+  color: #64748b;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.member-alignment-skill-row.is-met .member-alignment-levels { color: #047857; }
+.member-alignment-skill-row.is-gap .member-alignment-levels { color: #dc2626; }
+.member-alignment-skill-row.is-unassessed .member-alignment-levels { color: #94a3b8; }
+
 .member-select-empty {
   grid-column: 1 / -1;
 }
@@ -3918,6 +4072,19 @@ a.module-kpi-card:hover {
 }
 
 @media (max-width: 760px) {
+  .member-filter-bar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .member-filter-reset {
+    width: 100%;
+  }
+
+  .member-filter-count {
+    justify-self: start;
+  }
+
   .member-select-grid {
     grid-template-columns: 1fr;
   }
