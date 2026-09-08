@@ -34,22 +34,12 @@
           <span class="nav-label">Projects</span>
         </a>
         {% if current_user.role == 'admin' %}
-        <a class="{% if request.endpoint == 'competency.list_employees' %}active{% endif %}"
-          href="{{ url_for('competency.list_employees') }}" title="Team">
-          <span class="nav-ico nav-ico-team" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h2a4.5 4.5 0 0 1 4.5 4.5V20M14.5 15a4 4 0 0 1 6 3.5V20"></path></svg></span>
-          <span class="nav-label">Team</span>
-        </a>
         <a class="{% if request.endpoint and request.endpoint.startswith('competency.') and request.endpoint != 'competency.list_employees' %}active{% endif %}"
           href="{{ url_for('competency.list_skills') }}" title="Competencies">
           <span class="nav-ico nav-ico-competencies" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="4"></circle><path d="m15 9 5-5M16 4h4v4M12 12l4-4"></path></svg></span>
           <span class="nav-label">Competencies</span>
         </a>
         {% elif current_user.role == 'manager' %}
-        <a class="{% if request.endpoint == 'competency.list_employees' %}active{% endif %}"
-          href="{{ url_for('competency.list_employees') }}" title="Team">
-          <span class="nav-ico nav-ico-team" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h2a4.5 4.5 0 0 1 4.5 4.5V20M14.5 15a4 4 0 0 1 6 3.5V20"></path></svg></span>
-          <span class="nav-label">Team</span>
-        </a>
         <a class="{% if request.endpoint and request.endpoint.startswith('competency.') and request.endpoint != 'competency.list_employees' %}active{% endif %}"
           href="{{ url_for('competency.overview') }}" title="Competencies">
           <span class="nav-ico nav-ico-competencies" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="4"></circle><path d="m15 9 5-5M16 4h4v4M12 12l4-4"></path></svg></span>
@@ -73,6 +63,19 @@
           <span class="nav-ico nav-ico-reports" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20V10h4v10M10 20V4h4v16M16 20v-7h4v7M3 20h18"></path></svg></span>
           <span class="nav-label">Reports</span>
         </a>
+        {% if current_user.role == 'admin' %}
+        <a class="{% if request.endpoint == 'competency.list_employees' %}active{% endif %}"
+          href="{{ url_for('competency.list_employees') }}" title="Team">
+          <span class="nav-ico nav-ico-team" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h2a4.5 4.5 0 0 1 4.5 4.5V20M14.5 15a4 4 0 0 1 6 3.5V20"></path></svg></span>
+          <span class="nav-label">Team</span>
+        </a>
+        {% elif current_user.role == 'manager' %}
+        <a class="{% if request.endpoint == 'competency.list_employees' %}active{% endif %}"
+          href="{{ url_for('competency.list_employees') }}" title="Team">
+          <span class="nav-ico nav-ico-team" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h2a4.5 4.5 0 0 1 4.5 4.5V20M14.5 15a4 4 0 0 1 6 3.5V20"></path></svg></span>
+          <span class="nav-label">Team</span>
+        </a>
+        {% endif %}
         {% endif %}
         {% if current_user.role == 'admin' %}
         <a class="{% if request.endpoint == 'auth.accounts' %}active{% endif %}" href="{{ url_for('auth.accounts') }}" title="Settings">
