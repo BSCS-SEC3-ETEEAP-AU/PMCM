@@ -1,21 +1,48 @@
 """Shared competency requirement rules.
 
-Project/task requirements are the source of truth for target proficiency. An
-employee's assessment stores observed/current proficiency, while the active
-work assigned to that employee determines the target used for gap analysis and
-learning recommendations.
+Project-level and task-level requirements are the source of truth for target
+proficiency. An employee's assessment stores observed/current proficiency,
+while active project membership and assigned work determine the target used
+for gap analysis and learning recommendations.
 """
-from .models import db, Project, Task
+from .models import db, Project, Task, ProjectMember, ProjectSkillRequirement
 
 
 def active_project_requirements(employee_id):
-    """Return active, unfinished task requirements keyed by skill id.
+    """Return active project/task competency requirements keyed by skill id.
 
-    When more than one active task requires the same skill, the highest
-    required level is used as the target. Source projects/tasks are retained so
-    the UI can explain where the target came from.
+    Project-level requirements apply to every member of an active project.
+    Active, unfinished task requirements are also included for tasks assigned
+    to the employee. When multiple sources require the same skill, the highest
+    required level is used as the target. Source projects/tasks are retained
+    so the UI can explain where the target came from.
     """
-    rows = (
+    requirements = {}
+
+    project_rows = (
+        db.session.query(ProjectSkillRequirement, Project)
+        .join(Project, Project.id == ProjectSkillRequirement.project_id)
+        .join(ProjectMember, ProjectMember.project_id == Project.id)
+        .filter(
+            ProjectMember.employee_id == employee_id,
+            Project.status == "Active",
+        )
+        .order_by(Project.name, ProjectSkillRequirement.skill_id)
+        .all()
+    )
+
+    for requirement, project in project_rows:
+        level = max(1, min(5, int(requirement.required_level or 1)))
+        entry = requirements.setdefault(requirement.skill_id, {
+            "required_level": level,
+            "projects": [],
+            "tasks": [],
+        })
+        entry["required_level"] = max(entry["required_level"], level)
+        if project.name not in entry["projects"]:
+            entry["projects"].append(project.name)
+
+    task_rows = (
         db.session.query(Task, Project)
         .join(Project, Task.project_id == Project.id)
         .filter(
@@ -28,8 +55,7 @@ def active_project_requirements(employee_id):
         .all()
     )
 
-    requirements = {}
-    for task, project in rows:
+    for task, project in task_rows:
         level = max(1, min(5, int(task.required_level or 1)))
         entry = requirements.setdefault(task.required_skill_id, {
             "required_level": level,

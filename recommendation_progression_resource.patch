@@ -1,0 +1,16 @@
+--- a/app/modules/recommendation.py
++++ b/app/modules/recommendation.py
+@@ -98,11 +98,12 @@
+             else:
+                 # An unassessed required skill is a development need, but its
+                 # numerical gap is unknown until the employee records a level.
+                 gap = None
++                # For an unassessed required skill, any active learning resource
++                # for the skill can serve as a development step toward the required target.
+                 resource_matches = lambda resource: (
+                     resource.skill_id == skill_id
+-                    and resource.target_level >= target
+                 )
+ 
+             matched = [resource for resource in resources if resource_matches(resource)]
+             skill = assessment.skill if assessment else skills.get(skill_id)

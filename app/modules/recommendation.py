@@ -67,6 +67,7 @@ def _refresh_recommendations(employee_ids):
 
     employees = Employee.query.filter(Employee.id.in_(employee_ids)).all()
     resources = LearningResource.query.filter_by(is_active=True).all()
+    skills = {skill.id: skill for skill in Skill.query.all()}
     valid_pairs = set()
     created = 0
     updated = 0
@@ -81,32 +82,51 @@ def _refresh_recommendations(employee_ids):
 
         for skill_id, requirement in requirements.items():
             assessment = assessment_map.get(skill_id)
-            if not assessment:
-                continue
-
             target = requirement["required_level"]
-            # Keep the legacy stored target synchronized for compatibility/reporting,
-            # while active project/task requirements remain the source of truth.
-            assessment.required_level = target
-            gap = max(0, target - assessment.current_level)
-            if gap <= 0:
-                continue
 
-            matched = [
-                resource for resource in resources
-                if resource.skill_id == skill_id
-                and resource.target_level >= assessment.current_level + 1
-            ]
-            project_text = ", ".join(requirement["projects"])
+            if assessment:
+                # Keep the legacy stored target synchronized for compatibility/reporting,
+                # while active project/task requirements remain the source of truth.
+                assessment.required_level = target
+                gap = max(0, target - assessment.current_level)
+                if gap <= 0:
+                    continue
+                resource_matches = lambda resource: (
+                    resource.skill_id == skill_id
+                    and resource.target_level >= assessment.current_level + 1
+                )
+            else:
+                # An unassessed required skill is a development need, but its
+                # numerical gap is unknown until the employee records a level.
+                gap = None
+                # For an unassessed required skill, any active learning resource
+                # for the skill can serve as a development step toward the required target.
+                resource_matches = lambda resource: (
+                    resource.skill_id == skill_id
+                )
+
+            matched = [resource for resource in resources if resource_matches(resource)]
+            skill = assessment.skill if assessment else skills.get(skill_id)
+            if not skill:
+                continue
+            skill_name = skill.name
+            project_text = ", ".join(requirement["projects"]) or "active project work"
 
             for resource in matched:
                 pair = (emp.id, resource.id, skill_id)
                 valid_pairs.add(pair)
-                reason = (
-                    f"Gap of {gap} in {assessment.skill.name} "
-                    f"({assessment.current_level}→{target}) required by {project_text}. "
-                    f"Resource builds toward level {resource.target_level}."
-                )
+                if assessment:
+                    reason = (
+                        f"Gap of {gap} in {skill_name} "
+                        f"({assessment.current_level}→{target}) required by {project_text}. "
+                        f"Resource builds toward level {resource.target_level}."
+                    )
+                else:
+                    reason = (
+                        f"{skill_name} is required at Level {target} by {project_text}, "
+                        "but current proficiency has not been assessed. "
+                        f"Resource builds toward level {resource.target_level}."
+                    )
                 existing = (
                     LearningRecommendation.query
                     .filter_by(employee_id=emp.id, resource_id=resource.id, skill_id=skill_id)
@@ -146,7 +166,9 @@ def _refresh_recommendations(employee_ids):
     )
     for rec in active_recs:
         pair = (rec.employee_id, rec.resource_id, rec.skill_id)
-        if rec.status == "Recommended" and pair not in valid_pairs:
+        if rec.status in ("Recommended", "In Progress") and pair not in valid_pairs:
+            # Active recommendations are tied to current project-driven requirements.
+            # Completed records remain as learning history.
             db.session.delete(rec)
             removed += 1
             continue

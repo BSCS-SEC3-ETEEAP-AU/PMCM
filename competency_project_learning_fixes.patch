@@ -1,0 +1,284 @@
+diff --git a/app/competency_rules.py b/app/competency_rules.py
+--- a/app/competency_rules.py
++++ b/app/competency_rules.py
+@@ -1,21 +1,48 @@
+ """Shared competency requirement rules.
+ 
+-Project/task requirements are the source of truth for target proficiency. An
+-employee's assessment stores observed/current proficiency, while the active
+-work assigned to that employee determines the target used for gap analysis and
+-learning recommendations.
++Project-level and task-level requirements are the source of truth for target
++proficiency. An employee's assessment stores observed/current proficiency,
++while active project membership and assigned work determine the target used
++for gap analysis and learning recommendations.
+ """
+-from .models import db, Project, Task
++from .models import db, Project, Task, ProjectMember, ProjectSkillRequirement
+ 
+ 
+ def active_project_requirements(employee_id):
+-    """Return active, unfinished task requirements keyed by skill id.
++    """Return active project/task competency requirements keyed by skill id.
+ 
+-    When more than one active task requires the same skill, the highest
+-    required level is used as the target. Source projects/tasks are retained so
+-    the UI can explain where the target came from.
++    Project-level requirements apply to every member of an active project.
++    Active, unfinished task requirements are also included for tasks assigned
++    to the employee. When multiple sources require the same skill, the highest
++    required level is used as the target. Source projects/tasks are retained
++    so the UI can explain where the target came from.
+     """
+-    rows = (
++    requirements = {}
++
++    project_rows = (
++        db.session.query(ProjectSkillRequirement, Project)
++        .join(Project, Project.id == ProjectSkillRequirement.project_id)
++        .join(ProjectMember, ProjectMember.project_id == Project.id)
++        .filter(
++            ProjectMember.employee_id == employee_id,
++            Project.status == "Active",
++        )
++        .order_by(Project.name, ProjectSkillRequirement.skill_id)
++        .all()
++    )
++
++    for requirement, project in project_rows:
++        level = max(1, min(5, int(requirement.required_level or 1)))
++        entry = requirements.setdefault(requirement.skill_id, {
++            "required_level": level,
++            "projects": [],
++            "tasks": [],
++        })
++        entry["required_level"] = max(entry["required_level"], level)
++        if project.name not in entry["projects"]:
++            entry["projects"].append(project.name)
++
++    task_rows = (
+         db.session.query(Task, Project)
+         .join(Project, Task.project_id == Project.id)
+         .filter(
+@@ -28,8 +55,7 @@
+         .all()
+     )
+ 
+-    requirements = {}
+-    for task, project in rows:
++    for task, project in task_rows:
+         level = max(1, min(5, int(task.required_level or 1)))
+         entry = requirements.setdefault(task.required_skill_id, {
+             "required_level": level,
+diff --git a/app/modules/recommendation.py b/app/modules/recommendation.py
+--- a/app/modules/recommendation.py
++++ b/app/modules/recommendation.py
+@@ -67,6 +67,7 @@
+ 
+     employees = Employee.query.filter(Employee.id.in_(employee_ids)).all()
+     resources = LearningResource.query.filter_by(is_active=True).all()
++    skills = {skill.id: skill for skill in Skill.query.all()}
+     valid_pairs = set()
+     created = 0
+     updated = 0
+@@ -81,32 +82,50 @@
+ 
+         for skill_id, requirement in requirements.items():
+             assessment = assessment_map.get(skill_id)
+-            if not assessment:
+-                continue
+-
+             target = requirement["required_level"]
+-            # Keep the legacy stored target synchronized for compatibility/reporting,
+-            # while active project/task requirements remain the source of truth.
+-            assessment.required_level = target
+-            gap = max(0, target - assessment.current_level)
+-            if gap <= 0:
+-                continue
+ 
+-            matched = [
+-                resource for resource in resources
+-                if resource.skill_id == skill_id
+-                and resource.target_level >= assessment.current_level + 1
+-            ]
+-            project_text = ", ".join(requirement["projects"])
++            if assessment:
++                # Keep the legacy stored target synchronized for compatibility/reporting,
++                # while active project/task requirements remain the source of truth.
++                assessment.required_level = target
++                gap = max(0, target - assessment.current_level)
++                if gap <= 0:
++                    continue
++                resource_matches = lambda resource: (
++                    resource.skill_id == skill_id
++                    and resource.target_level >= assessment.current_level + 1
++                )
++            else:
++                # An unassessed required skill is a development need, but its
++                # numerical gap is unknown until the employee records a level.
++                gap = None
++                resource_matches = lambda resource: (
++                    resource.skill_id == skill_id
++                    and resource.target_level >= target
++                )
++
++            matched = [resource for resource in resources if resource_matches(resource)]
++            skill = assessment.skill if assessment else skills.get(skill_id)
++            if not skill:
++                continue
++            skill_name = skill.name
++            project_text = ", ".join(requirement["projects"]) or "active project work"
+ 
+             for resource in matched:
+                 pair = (emp.id, resource.id, skill_id)
+                 valid_pairs.add(pair)
+-                reason = (
+-                    f"Gap of {gap} in {assessment.skill.name} "
+-                    f"({assessment.current_level}→{target}) required by {project_text}. "
+-                    f"Resource builds toward level {resource.target_level}."
+-                )
++                if assessment:
++                    reason = (
++                        f"Gap of {gap} in {skill_name} "
++                        f"({assessment.current_level}→{target}) required by {project_text}. "
++                        f"Resource builds toward level {resource.target_level}."
++                    )
++                else:
++                    reason = (
++                        f"{skill_name} is required at Level {target} by {project_text}, "
++                        "but current proficiency has not been assessed. "
++                        f"Resource builds toward level {resource.target_level}."
++                    )
+                 existing = (
+                     LearningRecommendation.query
+                     .filter_by(employee_id=emp.id, resource_id=resource.id, skill_id=skill_id)
+@@ -146,7 +165,9 @@
+     )
+     for rec in active_recs:
+         pair = (rec.employee_id, rec.resource_id, rec.skill_id)
+-        if rec.status == "Recommended" and pair not in valid_pairs:
++        if rec.status in ("Recommended", "In Progress") and pair not in valid_pairs:
++            # Active recommendations are tied to current project-driven requirements.
++            # Completed records remain as learning history.
+             db.session.delete(rec)
+             removed += 1
+             continue
+diff --git a/app/modules/projects.py b/app/modules/projects.py
+--- a/app/modules/projects.py
++++ b/app/modules/projects.py
+@@ -372,6 +372,9 @@
+             db.session.add(ProjectMember(project_id=proj.id, employee_id=emp_id))
+         _replace_project_requirements(proj.id, project_requirements)
+         db.session.commit()
++        # Refresh project-driven competency recommendations for all new members.
++        from .recommendation import _refresh_recommendations
++        _refresh_recommendations(selected_member_ids)
+         flash(f"Project '{name}' created.", "success")
+         return redirect(url_for("projects.detail", project_id=proj.id))
+ 
+@@ -531,6 +534,7 @@
+         elif status != "Completed" and previous_status == "Completed":
+             project.completed_at = None
+ 
++        affected_employee_ids = selected_member_ids | posted_member_ids
+         existing_links = ProjectMember.query.filter_by(project_id=project_id).all()
+         existing_ids = {link.employee_id for link in existing_links}
+         for link in existing_links:
+@@ -541,6 +545,10 @@
+ 
+         _replace_project_requirements(project_id, project_requirements)
+         db.session.commit()
++        # Refresh both current and removed members so stale project-driven
++        # recommendations are cleared immediately after an edit.
++        from .recommendation import _refresh_recommendations
++        _refresh_recommendations(affected_employee_ids)
+         flash(f"Project '{project.name}' updated.", "success")
+         return redirect(url_for("projects.detail", project_id=project.id))
+ 
+diff --git a/app/templates/competency/gap_report.html b/app/templates/competency/gap_report.html
+--- a/app/templates/competency/gap_report.html
++++ b/app/templates/competency/gap_report.html
+@@ -22,7 +22,7 @@
+     </span>
+     <div>
+       <strong>Project-driven competency view</strong>
+-      <p>Targets come from active assigned project tasks. Employees without a recorded proficiency remain pending assessment and are not yet included in learning recommendations.</p>
++      <p>Targets come from active project requirements and assigned project tasks. Unassessed required skills remain pending assessment but may still receive relevant learning recommendations.</p>
+     </div>
+   </div>
+   <div class="module-toolbar-actions gap-analysis-actions">
+diff --git a/app/templates/competency/assess.html b/app/templates/competency/assess.html
+--- a/app/templates/competency/assess.html
++++ b/app/templates/competency/assess.html
+@@ -85,7 +85,7 @@
+   <span class="assessment-info-icon">i</span>
+   <div>
+     <strong>Targets are project-driven</strong>
+-    <p>You only record current proficiency. Required levels come from active tasks assigned to this employee, keeping competency gaps and learning recommendations aligned with project needs.</p>
++    <p>You only record current proficiency. Required levels come from active project requirements and assigned tasks, keeping competency gaps and learning recommendations aligned with project needs.</p>
+   </div>
+ </div>
+ 
+@@ -104,7 +104,7 @@
+         {% for item in required_items %}{{ assessment_card(item, True) }}{% endfor %}
+       </div>
+     {% else %}
+-      <div class="module-panel empty-state assessment-empty">No active project tasks currently define competency targets for this employee. Existing competencies can still be updated below.</div>
++      <div class="module-panel empty-state assessment-empty">No active project or assigned task currently defines competency targets for this employee. Existing competencies can still be updated below.</div>
+     {% endif %}
+   </section>
+ 
+@@ -114,7 +114,7 @@
+       <span class="module-count">{{ optional_items|length }}</span>
+     </summary>
+     <div class="assessment-additional-body">
+-      <p class="assessment-additional-note">These proficiency records remain part of the employee profile, but they do not create a competency gap or learning recommendation until an active project/task requires the skill.</p>
++      <p class="assessment-additional-note">These proficiency records remain part of the employee profile. An active project requirement or assigned task can make a skill relevant for gap analysis and learning recommendations.</p>
+       <div class="assessment-card-list">
+         {% for item in optional_items %}{{ assessment_card(item, False) }}{% endfor %}
+       </div>
+diff --git a/app/templates/recommendation/list.html b/app/templates/recommendation/list.html
+--- a/app/templates/recommendation/list.html
++++ b/app/templates/recommendation/list.html
+@@ -14,7 +14,7 @@
+ {% endif %}
+ 
+ <section class="module-toolbar learning-toolbar">
+-  <div class="module-info-banner"><span>i</span><p>{% if own %}Your recommendations refresh automatically from active project competency gaps when My Learning opens. You can also refresh them manually. Completing a resource records learning progress; proficiency changes only after reassessment.{% else %}Team recommendations are generated from active project competency gaps. Managers can refresh team recommendations and monitor progress, while each employee controls the status of their own learning activities.{% endif %}</p></div>
++  <div class="module-info-banner"><span>i</span><p>{% if own %}Your recommendations refresh automatically from active project competency gaps when My Learning opens. Required skills without an assessment can still receive learning recommendations; proficiency changes only after reassessment.{% else %}Team recommendations are generated from active project competency gaps, including required skills that still need assessment. Managers can refresh team recommendations and monitor progress, while each employee controls the status of their own learning activities.{% endif %}</p></div>
+   <form id="recommendationEngineForm" method="POST" action="{{ url_for('recommendation.generate') }}">
+     <input type="hidden" name="scope" value="{{ 'my' if own else 'team' }}">
+     <button id="recommendationEngineButton" class="btn" type="submit"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66"/><path d="M20 4v7h-7"/></svg><span>{% if own %}Refresh My Recommendations{% else %}Refresh Team Recommendations{% endif %}</span></button>
+@@ -23,7 +23,7 @@
+ 
+ <section class="learning-list">
+   {% for r in recs %}
+-  {% set priority = 'High' if r.gap >= 2 else 'Medium' %}
++  {% set priority = 'High' if r.gap is not none and r.gap >= 2 else 'Medium' %}
+   <article class="learning-card">
+     <div class="learning-resource-icon resource-{{ r.resource.resource_type|lower|replace(' ','-') }}">
+       {% if r.resource.resource_type == 'Certification' %}
+@@ -63,7 +63,11 @@
+     </div>
+     <div class="learning-meta">
+       <span>Competency Gap</span>
++      {% if r.gap is none %}
++      <strong>Assessment Needed</strong>
++      {% else %}
+       <strong>{{ r.gap }} level{{ '' if r.gap == 1 else 's' }}</strong>
++      {% endif %}
+     </div>
+     <div class="learning-actions">
+       {% if r.resource.url %}<a class="btn secondary small" href="{{ r.resource.url }}" target="_blank" rel="noopener">Open Resource</a>{% endif %}
+diff --git a/app/templates/reports/learning_progress.html b/app/templates/reports/learning_progress.html
+--- a/app/templates/reports/learning_progress.html
++++ b/app/templates/reports/learning_progress.html
+@@ -32,7 +32,7 @@
+     <tbody>{% for r in rows %}<tr>
+       <td><strong>{{ r.employee }}</strong></td><td>{{ r.team }}</td><td>{{ r.resource }}</td><td>{{ r.skill }}</td>
+       <td>{{ r.provider }}<small class="report-subtext">{{ r.access }}</small></td><td><span class="report-status report-status-{{ r.status|lower|replace(' ','-') }}">{{ r.status }}</span></td>
+-      <td>{{ r.gap }} level{{ '' if r.gap == 1 else 's' }}</td><td>{{ r.created_at.strftime('%b %d, %Y') if r.created_at else '—' }}</td><td>{{ r.completed_at.strftime('%b %d, %Y') if r.completed_at else '—' }}</td>
++      <td>{% if r.gap is none %}Assessment Needed{% else %}{{ r.gap }} level{{ '' if r.gap == 1 else 's' }}{% endif %}</td><td>{{ r.created_at.strftime('%b %d, %Y') if r.created_at else '—' }}</td><td>{{ r.completed_at.strftime('%b %d, %Y') if r.completed_at else '—' }}</td>
+     </tr>{% else %}<tr><td colspan="9"><div class="empty-state">No learning records match the selected filters.</div></td></tr>{% endfor %}</tbody>
+   </table></div>
+ </section>

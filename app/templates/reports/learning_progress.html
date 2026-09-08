@@ -32,7 +32,7 @@
     <tbody>{% for r in rows %}<tr>
       <td><strong>{{ r.employee }}</strong></td><td>{{ r.team }}</td><td>{{ r.resource }}</td><td>{{ r.skill }}</td>
       <td>{{ r.provider }}<small class="report-subtext">{{ r.access }}</small></td><td><span class="report-status report-status-{{ r.status|lower|replace(' ','-') }}">{{ r.status }}</span></td>
-      <td>{{ r.gap }} level{{ '' if r.gap == 1 else 's' }}</td><td>{{ r.created_at.strftime('%b %d, %Y') if r.created_at else '—' }}</td><td>{{ r.completed_at.strftime('%b %d, %Y') if r.completed_at else '—' }}</td>
+      <td>{% if r.gap is none %}Assessment Needed{% else %}{{ r.gap }} level{{ '' if r.gap == 1 else 's' }}{% endif %}</td><td>{{ r.created_at.strftime('%b %d, %Y') if r.created_at else '—' }}</td><td>{{ r.completed_at.strftime('%b %d, %Y') if r.completed_at else '—' }}</td>
     </tr>{% else %}<tr><td colspan="9"><div class="empty-state">No learning records match the selected filters.</div></td></tr>{% endfor %}</tbody>
   </table></div>
 </section>

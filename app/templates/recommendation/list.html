@@ -14,7 +14,7 @@
 {% endif %}
 
 <section class="module-toolbar learning-toolbar">
-  <div class="module-info-banner"><span>i</span><p>{% if own %}Your recommendations refresh automatically from active project competency gaps when My Learning opens. You can also refresh them manually. Completing a resource records learning progress; proficiency changes only after reassessment.{% else %}Team recommendations are generated from active project competency gaps. Managers can refresh team recommendations and monitor progress, while each employee controls the status of their own learning activities.{% endif %}</p></div>
+  <div class="module-info-banner"><span>i</span><p>{% if own %}Your recommendations refresh automatically from active project competency gaps when My Learning opens. Required skills without an assessment can still receive learning recommendations; proficiency changes only after reassessment.{% else %}Team recommendations are generated from active project competency gaps, including required skills that still need assessment. Managers can refresh team recommendations and monitor progress, while each employee controls the status of their own learning activities.{% endif %}</p></div>
   <form id="recommendationEngineForm" method="POST" action="{{ url_for('recommendation.generate') }}">
     <input type="hidden" name="scope" value="{{ 'my' if own else 'team' }}">
     <button id="recommendationEngineButton" class="btn" type="submit"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66"/><path d="M20 4v7h-7"/></svg><span>{% if own %}Refresh My Recommendations{% else %}Refresh Team Recommendations{% endif %}</span></button>
@@ -23,7 +23,7 @@
 
 <section class="learning-list">
   {% for r in recs %}
-  {% set priority = 'High' if r.gap >= 2 else 'Medium' %}
+  {% set priority = 'High' if r.gap is not none and r.gap >= 2 else 'Medium' %}
   <article class="learning-card">
     <div class="learning-resource-icon resource-{{ r.resource.resource_type|lower|replace(' ','-') }}">
       {% if r.resource.resource_type == 'Certification' %}
@@ -63,7 +63,11 @@
     </div>
     <div class="learning-meta">
       <span>Competency Gap</span>
+      {% if r.gap is none %}
+      <strong>Assessment Needed</strong>
+      {% else %}
       <strong>{{ r.gap }} level{{ '' if r.gap == 1 else 's' }}</strong>
+      {% endif %}
     </div>
     <div class="learning-actions">
       {% if r.resource.url %}<a class="btn secondary small" href="{{ r.resource.url }}" target="_blank" rel="noopener">Open Resource</a>{% endif %}

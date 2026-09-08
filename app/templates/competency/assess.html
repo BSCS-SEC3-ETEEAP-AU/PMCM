@@ -85,7 +85,7 @@
   <span class="assessment-info-icon">i</span>
   <div>
     <strong>Targets are project-driven</strong>
-    <p>You only record current proficiency. Required levels come from active tasks assigned to this employee, keeping competency gaps and learning recommendations aligned with project needs.</p>
+    <p>You only record current proficiency. Required levels come from active project requirements and assigned tasks, keeping competency gaps and learning recommendations aligned with project needs.</p>
   </div>
 </div>
 
@@ -104,7 +104,7 @@
         {% for item in required_items %}{{ assessment_card(item, True) }}{% endfor %}
       </div>
     {% else %}
-      <div class="module-panel empty-state assessment-empty">No active project tasks currently define competency targets for this employee. Existing competencies can still be updated below.</div>
+      <div class="module-panel empty-state assessment-empty">No active project or assigned task currently defines competency targets for this employee. Existing competencies can still be updated below.</div>
     {% endif %}
   </section>
 
@@ -114,7 +114,7 @@
       <span class="module-count">{{ optional_items|length }}</span>
     </summary>
     <div class="assessment-additional-body">
-      <p class="assessment-additional-note">These proficiency records remain part of the employee profile, but they do not create a competency gap or learning recommendation until an active project/task requires the skill.</p>
+      <p class="assessment-additional-note">These proficiency records remain part of the employee profile. An active project requirement or assigned task can make a skill relevant for gap analysis and learning recommendations.</p>
       <div class="assessment-card-list">
         {% for item in optional_items %}{{ assessment_card(item, False) }}{% endfor %}
       </div>

@@ -372,6 +372,9 @@ def create_project():
             db.session.add(ProjectMember(project_id=proj.id, employee_id=emp_id))
         _replace_project_requirements(proj.id, project_requirements)
         db.session.commit()
+        # Refresh project-driven competency recommendations for all new members.
+        from .recommendation import _refresh_recommendations
+        _refresh_recommendations(selected_member_ids)
         flash(f"Project '{name}' created.", "success")
         return redirect(url_for("projects.detail", project_id=proj.id))
 
@@ -531,6 +534,7 @@ def edit_project(project_id):
         elif status != "Completed" and previous_status == "Completed":
             project.completed_at = None
 
+        affected_employee_ids = selected_member_ids | posted_member_ids
         existing_links = ProjectMember.query.filter_by(project_id=project_id).all()
         existing_ids = {link.employee_id for link in existing_links}
         for link in existing_links:
@@ -541,6 +545,10 @@ def edit_project(project_id):
 
         _replace_project_requirements(project_id, project_requirements)
         db.session.commit()
+        # Refresh both current and removed members so stale project-driven
+        # recommendations are cleared immediately after an edit.
+        from .recommendation import _refresh_recommendations
+        _refresh_recommendations(affected_employee_ids)
         flash(f"Project '{project.name}' updated.", "success")
         return redirect(url_for("projects.detail", project_id=project.id))
 

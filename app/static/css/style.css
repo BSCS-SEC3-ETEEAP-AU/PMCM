@@ -5849,7 +5849,62 @@ a.module-kpi-card:hover {
 .repository-empty-state svg { width: 32px; height: 32px; color: #64748b; margin-bottom: 8px; }
 .repository-empty-state h3 { margin: 0 0 4px; color: #0f172a; }
 .repository-empty-state p { margin: 0; color: #64748b; }
-.repository-dialog { width: min(680px, calc(100vw - 28px)); }
+.repository-dialog {
+  width: min(720px, calc(100vw - 32px));
+  max-width: 720px;
+  margin: auto;
+  border: 0;
+  border-radius: 16px;
+  padding: 0;
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+  overflow: hidden;
+}
+.repository-dialog::backdrop { background: rgba(15, 23, 42, 0.42); }
+.repository-dialog form { margin: 0; }
+.repository-dialog .dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+.repository-dialog .dialog-eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.repository-dialog .dialog-head h3 { margin: 0; color: #0f172a; font-size: 20px; }
+.repository-dialog .dialog-close {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  color: #475569;
+  font-size: 21px;
+  line-height: 1;
+  cursor: pointer;
+}
+.repository-dialog .dialog-close:hover { background: #f1f5f9; color: #0f172a; }
+.repository-dialog .repository-dialog-body { padding: 22px 24px 24px; }
+.repository-dialog .dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  padding: 14px 24px 20px;
+  border-top: 1px solid #e2e8f0;
+  background: #fff;
+}
+.repository-dialog .dialog-actions .btn { min-width: 110px; }
 .repository-dialog-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
 .repository-dialog-body label { display: grid; gap: 6px; color: #334155; font-size: 11px; font-weight: 700; }
 .repository-dialog-body input,
