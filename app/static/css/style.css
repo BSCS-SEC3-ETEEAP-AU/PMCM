@@ -1693,6 +1693,16 @@ a.module-kpi-card:hover {
   border-color: #b7dcd7;
 }
 
+.btn.danger {
+  background: #dc2626;
+  color: #fff;
+}
+
+.btn.danger:hover {
+  background: #b91c1c;
+  color: #fff;
+}
+
 /* Competency profile */
 .profile-hero {
   display: flex;

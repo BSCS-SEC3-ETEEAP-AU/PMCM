@@ -9,7 +9,12 @@
     {% if project.description %}<p class="muted project-description">{{ project.description }}</p>{% endif %}
   </div>
   <div class="project-detail-actions">
-    {% if can_manage_project %}<a class="btn secondary" href="{{ url_for('projects.edit_project', project_id=project.id) }}">Edit Project</a>{% endif %}
+    {% if can_manage_project %}
+    <a class="btn secondary" href="{{ url_for('projects.edit_project', project_id=project.id) }}">Edit Project</a>
+    <form method="POST" action="{{ url_for('projects.delete_project', project_id=project.id) }}" onsubmit="return confirm('Delete this project? This will permanently remove its tasks, milestones, team assignments, and project skill requirements.');">
+      <button class="btn danger" type="submit">Delete Project</button>
+    </form>
+    {% endif %}
     <span class="priority-pill priority-{{ (project.priority or 'Medium')|lower }}"><i></i>{{ project.priority or 'Medium' }} Priority</span>
     <span class="status-pill status-{{ project.status|lower|replace(' ','') }}">{{ project.status }}</span>
   </div>

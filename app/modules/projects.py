@@ -564,6 +564,42 @@ def edit_project(project_id):
     )
 
 
+@projects_bp.route("/<int:project_id>/delete", methods=["POST"])
+@manager_required
+def delete_project(project_id):
+    """Delete a project and its project-owned records after authorization."""
+    project = Project.query.get_or_404(project_id)
+    _require_project_manager(project)
+
+    # Capture affected employees before removing project membership. Their
+    # project-driven recommendations must be refreshed after the deletion.
+    affected_employee_ids = _selected_member_ids(project_id)
+
+    ProjectSkillRequirement.query.filter_by(project_id=project_id).delete(
+        synchronize_session=False
+    )
+    Milestone.query.filter_by(project_id=project_id).delete(
+        synchronize_session=False
+    )
+    Task.query.filter_by(project_id=project_id).delete(
+        synchronize_session=False
+    )
+    ProjectMember.query.filter_by(project_id=project_id).delete(
+        synchronize_session=False
+    )
+
+    project_name = project.name
+    db.session.delete(project)
+    db.session.commit()
+
+    if affected_employee_ids:
+        from .recommendation import _refresh_recommendations
+        _refresh_recommendations(affected_employee_ids)
+
+    flash(f"Project '{project_name}' deleted.", "success")
+    return redirect(url_for("projects.list_projects"))
+
+
 @projects_bp.route("/<int:project_id>")
 @login_required
 def detail(project_id):
