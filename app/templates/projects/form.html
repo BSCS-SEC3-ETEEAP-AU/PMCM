@@ -11,15 +11,27 @@
   <label>Description
     <textarea name="description" rows="3">{{ project.description if editing else request.form.get('description','') }}</textarea>
   </label>
-  <div class="row-2">
+  <label>Requester Email
+    <input
+      type="email"
+      name="requester_email"
+      maxlength="120"
+      value="{{ project.requester_email if editing else request.form.get('requester_email','') }}"
+      placeholder="requester@company.com"
+      {% if not editing %}required{% endif %}
+    >
+    <small class="field-hint">The requester will receive an email when this project is marked as completed.</small>
+  </label>
+  {% if editing %}<div class="row-2">{% endif %}
+    {% if editing %}
     <label>Status
-      {% set current_status = project.status if editing else request.form.get('status','Active') %}
       <select name="status">
         {% for status in project_statuses %}
-        <option value="{{ status }}" {% if current_status == status %}selected{% endif %}>{{ status }}</option>
+        <option value="{{ status }}" {% if project.status == status %}selected{% endif %}>{{ status }}</option>
         {% endfor %}
       </select>
     </label>
+    {% endif %}
     <label>Project Priority / Urgency
       {% set current_priority = (project.priority or 'Medium') if editing else request.form.get('priority','Medium') %}
       <select name="priority">
@@ -29,7 +41,7 @@
       </select>
       <small class="field-hint">High priority projects receive stronger visual urgency indicators.</small>
     </label>
-  </div>
+  {% if editing %}</div>{% endif %}
   <div class="row-2">
     <label>Start Date
       <input type="date" name="start_date" value="{{ project.start_date.isoformat() if editing and project.start_date else request.form.get('start_date','') }}">
@@ -78,7 +90,7 @@
     {% if editing %}
     <p class="muted form-help">Current team members stay selected even if they are now unavailable or at capacity. Capacity rules apply only when adding a new member, and skill alignment updates as project requirements change.</p>
     {% else %}
-    <p class="muted form-help">Active-account team members are shown for workforce visibility. Available employees with remaining capacity can be selected and are ranked by skill alignment when project requirements are defined. Unavailable and at-capacity employees remain at the bottom.</p>
+    <p class="muted form-help">Active-account team members are shown for workforce visibility. Available employees with remaining capacity can be selected and are ranked by skill alignment when project requirements are defined. Unavailable and at-capacity employees remain in the other tab.</p>
     {% endif %}
     <div class="member-filter-bar" aria-label="Team member filters">
       <div class="member-filter-group">
@@ -96,6 +108,16 @@
       <button class="btn small secondary member-filter-reset" id="memberFilterReset" type="button">Clear Filters</button>
       <span class="member-filter-count" id="memberFilterCount" aria-live="polite"></span>
     </div>
+
+    <div class="member-status-tabs" role="tablist" aria-label="Team member availability">
+      <button class="member-status-tab is-active" type="button" role="tab" aria-selected="true" data-member-tab="available">
+        Available <span id="memberAvailableCount">0</span>
+      </button>
+      <button class="member-status-tab" type="button" role="tab" aria-selected="false" data-member-tab="unavailable">
+        At Capacity / Not Available <span id="memberUnavailableCount">0</span>
+      </button>
+    </div>
+
     <div class="member-select-grid">
       {% for e in employees %}
       {% set account_active = e.id in active_account_employee_ids if active_account_employee_ids is defined else true %}
@@ -105,8 +127,9 @@
       {% set at_capacity = capacity.at_capacity if capacity else false %}
       {% set eligible = capacity.is_available if capacity else true %}
       {% set selectable = current_member or eligible %}
+      {% set member_group = 'available' if eligible else 'unavailable' %}
       <div
-        class="member-select-card {% if current_member %}is-current-member{% endif %} {% if not selectable %}is-disabled{% endif %} {% if availability == 'Unavailable' %}is-unavailable{% elif at_capacity %}is-at-capacity{% else %}is-available{% endif %}"
+        class="member-select-card member-select-row {% if current_member %}is-current-member{% endif %} {% if not selectable %}is-disabled{% endif %} {% if availability == 'Unavailable' %}is-unavailable{% elif at_capacity %}is-at-capacity{% else %}is-available{% endif %}"
         id="memberCard-{{ e.id }}"
         data-employee-id="{{ e.id }}"
         data-employee-name="{{ e.full_name|lower }}"
@@ -114,8 +137,9 @@
         data-department="{{ e.team or '' }}"
         data-eligible="{{ '1' if eligible else '0' }}"
         data-current-member="{{ '1' if current_member else '0' }}"
+        data-member-group="{{ member_group }}"
       >
-        <div class="member-select-heading">
+        <div class="member-row-main">
           <label class="member-select-choice" for="member-{{ e.id }}">
             <input
               id="member-{{ e.id }}"
@@ -130,54 +154,71 @@
               <div class="member-name-line">
                 <strong>{{ e.full_name }}</strong>
                 <span class="member-position-title">{{ e.position or 'Position not set' }}</span>
-                {% if current_member %}<span class="member-current-badge">Current Team</span>{% endif %}
-                {% if editing and not account_active %}<span class="member-position-title">Account Disabled · historical member</span>{% endif %}
               </div>
-              <span class="member-team-name">{{ e.team or 'Department / team not assigned' }}</span>
             </div>
           </label>
-          {% if capacity and account_active %}
-          <button
-            class="member-capacity-edit"
-            type="button"
-            title="Edit availability and capacity"
-            aria-label="Edit availability and project capacity for {{ e.full_name }}"
-            data-update-url="{{ url_for('competency.update_employee_capacity', employee_id=e.id) }}"
-            data-employee-name="{{ e.full_name }}"
-            data-availability="{{ availability }}"
-            data-capacity="{{ capacity.capacity }}"
-            data-active-projects="{{ capacity.active_projects }}"
-          ><span aria-hidden="true">✎</span> Edit</button>
-          {% endif %}
-        </div>
-        {% if capacity %}
-        <div class="member-capacity-details">
-          <div class="member-capacity-row">
-            <span>Active Projects</span>
-            <strong class="capacity-active">{{ capacity.active_projects }}/{{ capacity.capacity }}</strong>
-          </div>
-          <div class="member-capacity-row">
-            <span>Slots Left</span>
-            <strong class="capacity-remaining">{{ capacity.remaining }}</strong>
-          </div>
-          <div class="member-capacity-row">
-            <span>Status</span>
-            <strong class="capacity-status {% if availability == 'Unavailable' %}status-unavailable{% elif at_capacity %}status-at-capacity{% else %}status-available{% endif %}">
-              {% if availability == 'Unavailable' %}Unavailable{% elif at_capacity %}At Capacity{% else %}Available{% endif %}
-            </strong>
-          </div>
-        </div>
-        {% endif %}
-        <div class="member-skill-alignment" data-alignment-employee="{{ e.id }}">
-          <div class="member-alignment-head">
-            <div>
-              <span class="member-alignment-kicker">Project Skill Alignment</span>
-              <strong class="member-alignment-status is-neutral">Not Evaluated</strong>
-            </div>
+
+          <div class="member-row-alignment" data-alignment-employee="{{ e.id }}">
+            <span class="member-alignment-kicker">Project Skill Alignment</span>
             <strong class="member-alignment-score">—</strong>
           </div>
-          <p class="member-alignment-summary">Add at least one required project skill to compare this employee's recorded proficiency.</p>
-          <div class="member-alignment-skill-list"></div>
+
+          <details class="member-row-details">
+            <summary>View details</summary>
+            <div class="member-details-body">
+              <div class="member-detail-item">
+                <span>Department / Team</span>
+                <strong>{{ e.team or 'Department / team not assigned' }}</strong>
+              </div>
+              {% if editing and not account_active %}
+              <div class="member-detail-note">Account Disabled · historical member</div>
+              {% endif %}
+              {% if current_member %}
+              <div class="member-detail-note is-current">Current Team Member</div>
+              {% endif %}
+              {% if capacity %}
+              <div class="member-capacity-details">
+                <div class="member-capacity-row">
+                  <span>Active Projects</span>
+                  <strong class="capacity-active">{{ capacity.active_projects }}/{{ capacity.capacity }}</strong>
+                </div>
+                <div class="member-capacity-row">
+                  <span>Slots Left</span>
+                  <strong class="capacity-remaining">{{ capacity.remaining }}</strong>
+                </div>
+                <div class="member-capacity-row">
+                  <span>Status</span>
+                  <strong class="capacity-status {% if availability == 'Unavailable' %}status-unavailable{% elif at_capacity %}status-at-capacity{% else %}status-available{% endif %}">
+                    {% if availability == 'Unavailable' %}Unavailable{% elif at_capacity %}At Capacity{% else %}Available{% endif %}
+                  </strong>
+                </div>
+              </div>
+              {% endif %}
+              {% if capacity and account_active %}
+              <button
+                class="member-capacity-edit"
+                type="button"
+                title="Edit availability and capacity"
+                aria-label="Edit availability and project capacity for {{ e.full_name }}"
+                data-update-url="{{ url_for('competency.update_employee_capacity', employee_id=e.id) }}"
+                data-employee-name="{{ e.full_name }}"
+                data-availability="{{ availability }}"
+                data-capacity="{{ capacity.capacity }}"
+                data-active-projects="{{ capacity.active_projects }}"
+              ><span aria-hidden="true">✎</span> Edit Availability</button>
+              {% endif %}
+              <div class="member-skill-alignment">
+                <div class="member-alignment-head">
+                  <div>
+                    <span class="member-alignment-kicker">Alignment Details</span>
+                    <strong class="member-alignment-status is-neutral">Not Evaluated</strong>
+                  </div>
+                </div>
+                <p class="member-alignment-summary">Add at least one required project skill to compare this employee's recorded proficiency.</p>
+                <div class="member-alignment-skill-list"></div>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
       {% else %}
@@ -192,8 +233,12 @@
     const departmentFilter = document.getElementById('memberDepartmentFilter');
     const resetButton = document.getElementById('memberFilterReset');
     const countEl = document.getElementById('memberFilterCount');
+    const availableCountEl = document.getElementById('memberAvailableCount');
+    const unavailableCountEl = document.getElementById('memberUnavailableCount');
+    const tabs = Array.from(document.querySelectorAll('[data-member-tab]'));
     if (!grid || !positionFilter || !departmentFilter) return;
 
+    let activeTab = 'available';
     const cards = () => Array.from(grid.querySelectorAll('.member-select-card'));
     const normalize = value => String(value || '').trim().toLocaleLowerCase();
 
@@ -215,6 +260,14 @@
         });
     };
 
+    const updateTabCounts = () => {
+      const allCards = cards();
+      const available = allCards.filter(card => card.dataset.memberGroup === 'available').length;
+      const unavailable = allCards.filter(card => card.dataset.memberGroup === 'unavailable').length;
+      if (availableCountEl) availableCountEl.textContent = available;
+      if (unavailableCountEl) unavailableCountEl.textContent = unavailable;
+    };
+
     const applyFilters = () => {
       const selectedPosition = positionFilter.value;
       const selectedDepartment = departmentFilter.value;
@@ -222,15 +275,28 @@
       const allCards = cards();
 
       allCards.forEach(card => {
+        const matchesTab = (card.dataset.memberGroup || 'available') === activeTab;
         const matchesPosition = !selectedPosition || normalize(card.dataset.position) === selectedPosition;
         const matchesDepartment = !selectedDepartment || normalize(card.dataset.department) === selectedDepartment;
-        const matches = matchesPosition && matchesDepartment;
+        const matches = matchesTab && matchesPosition && matchesDepartment;
         card.hidden = !matches;
         if (matches) visible += 1;
       });
 
       if (countEl) countEl.textContent = `Showing ${visible} of ${allCards.length} employees`;
     };
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        activeTab = tab.dataset.memberTab || 'available';
+        tabs.forEach(item => {
+          const selected = item === tab;
+          item.classList.toggle('is-active', selected);
+          item.setAttribute('aria-selected', selected ? 'true' : 'false');
+        });
+        applyFilters();
+      });
+    });
 
     populateFilter(positionFilter, 'position');
     populateFilter(departmentFilter, 'department');
@@ -241,6 +307,7 @@
       departmentFilter.value = '';
       applyFilters();
     });
+    updateTabCounts();
     applyFilters();
   })();
   </script>
@@ -337,6 +404,27 @@
   const saveButton = document.getElementById('newSkillSave');
   const rows = () => Array.from(list.querySelectorAll('.project-requirement-row'));
 
+  const syncSkillOptions = () => {
+    const selectedSkillIds = new Set(
+      rows()
+        .map(row => row.querySelector('select[name="requirement_skill_id"]')?.value)
+        .filter(Boolean)
+    );
+
+    rows().forEach(row => {
+      const select = row.querySelector('select[name="requirement_skill_id"]');
+      if (!select) return;
+      const currentValue = select.value;
+      Array.from(select.options).forEach(option => {
+        if (!option.value) {
+          option.hidden = false;
+          return;
+        }
+        option.hidden = selectedSkillIds.has(option.value) && option.value !== currentValue;
+      });
+    });
+  };
+
   const syncRemoveButtons = () => {
     rows().forEach(row => {
       const removeButton = row.querySelector('.project-requirement-remove');
@@ -351,6 +439,7 @@
     removeButton.addEventListener('click', () => {
       if (rows().length <= 1) return;
       row.remove();
+      syncSkillOptions();
       syncRemoveButtons();
     });
   };
@@ -362,11 +451,15 @@
     const skill = row.querySelector('select[name="requirement_skill_id"]');
     const level = row.querySelector('select[name="requirement_level"]');
     const removeButton = row.querySelector('.project-requirement-remove');
-    if (skill) skill.value = '';
+    if (skill) {
+      skill.value = '';
+      Array.from(skill.options).forEach(option => { option.hidden = false; });
+    }
     if (level) level.value = '3';
     if (removeButton) delete removeButton.dataset.bound;
     bindRow(row);
     list.appendChild(row);
+    syncSkillOptions();
     syncRemoveButtons();
     return row;
   };
@@ -387,6 +480,7 @@
       options.forEach(item => select.appendChild(item));
       select.value = selectedValue;
     });
+    syncSkillOptions();
   };
 
   const selectSkillForRequirement = skill => {
@@ -425,7 +519,14 @@
   };
 
   rows().forEach(bindRow);
+  syncSkillOptions();
   syncRemoveButtons();
+
+  list.addEventListener('change', event => {
+    if (event.target.matches('select[name="requirement_skill_id"]')) {
+      syncSkillOptions();
+    }
+  });
 
   addButton.addEventListener('click', () => {
     const row = appendRequirementRow();
@@ -556,10 +657,12 @@
     const box = card.querySelector('.member-skill-alignment');
     if (!box) return;
 
-    const scoreEl = box.querySelector('.member-alignment-score');
+    const scoreBox = card.querySelector('.member-row-alignment') || box;
+    const scoreEl = scoreBox.querySelector('.member-alignment-score');
     const statusEl = box.querySelector('.member-alignment-status');
     const summaryEl = box.querySelector('.member-alignment-summary');
     const listEl = box.querySelector('.member-alignment-skill-list');
+    if (!scoreEl || !statusEl || !summaryEl || !listEl) return;
     statusEl.className = 'member-alignment-status';
     listEl.innerHTML = '';
 

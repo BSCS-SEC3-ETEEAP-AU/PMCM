@@ -82,12 +82,34 @@
           {% if t.status != 'Done' %}<span class="deadline-badge deadline-{{ t.deadline_state }}">{{ t.deadline_label }}</span>{% else %}<span class="deadline-badge deadline-completed">Completed</span>{% endif %}
         </div>
         {% endif %}
+        {% if t.status_change_requested_status %}
+        <div class="task-status-request">
+          <div class="task-status-request-head">
+            <span class="task-status-request-badge">Pending approval</span>
+            <strong>{{ t.status_change_requested_status }}</strong>
+          </div>
+          <small>Requested by {{ t.status_change_requester.full_name if t.status_change_requester else 'Employee' }}{% if t.status_change_requested_at %} · {{ t.status_change_requested_at.strftime('%b %d, %Y %I:%M %p') }}{% endif %}</small>
+          {% if can_manage_project %}
+          <div class="task-status-request-actions">
+            <form method="POST" action="{{ url_for('projects.review_task_status_request', task_id=t.id, action='approve') }}">
+              <button class="btn small primary" type="submit">Approve</button>
+            </form>
+            <form method="POST" action="{{ url_for('projects.review_task_status_request', task_id=t.id, action='reject') }}">
+              <button class="btn small secondary" type="submit">Reject</button>
+            </form>
+          </div>
+          {% elif current_user.role == 'employee' and t.status_change_requested_by == current_user.employee_profile.id %}
+          <small class="task-status-request-note">Waiting for the project manager's approval.</small>
+          {% endif %}
+        </div>
+        {% endif %}
         {% if can_manage_project or (current_user.role == 'employee' and t.assignee and t.assignee.user_id == current_user.id) %}
         <form class="task-status-form" method="POST" action="{{ url_for('projects.update_task', task_id=t.id) }}">
-          <label for="task-status-{{ t.id }}">Workflow Status</label>
-          <select id="task-status-{{ t.id }}" name="status" onchange="this.form.submit()">
+          <label for="task-status-{{ t.id }}">{% if current_user.role == 'employee' %}Request Status Change{% else %}Workflow Status{% endif %}</label>
+          <select id="task-status-{{ t.id }}" name="status" onchange="this.form.submit()" {% if t.status_change_requested_status %}disabled{% endif %}>
             {% for s in statuses %}<option {% if s==t.status %}selected{% endif %}>{{ s }}</option>{% endfor %}
           </select>
+          {% if current_user.role == 'employee' and not t.status_change_requested_status %}<small class="task-status-help">Changes require approval from the project manager.</small>{% endif %}
         </form>
         {% endif %}
       </div>

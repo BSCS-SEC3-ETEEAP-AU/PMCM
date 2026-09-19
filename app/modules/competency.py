@@ -6,9 +6,10 @@ computes current vs required gaps that feed the recommendation engine.
 """
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, jsonify
 from flask_login import login_required, current_user
-from datetime import date
+from datetime import date, datetime
 from ..models import (
-    db, Employee, Skill, Certification, CompetencyAssessment, User, Project, ProjectMember,
+    db, Employee, Skill, Certification, CompetencyAssessment, CertificationApproval,
+    CompetencyAssessmentApproval, User, Project, ProjectMember,
 )
 from ..decorators import manager_required, admin_required
 from ..competency_rules import active_project_requirements
@@ -218,7 +219,14 @@ def employee_profile(employee_id):
     _enforce_employee_scope(employee_id)
     emp = Employee.query.get_or_404(employee_id)
     certs = Certification.query.filter_by(employee_id=employee_id).order_by(Certification.issued_date.desc()).all()
+    pending_certs = CertificationApproval.query.filter_by(
+        employee_id=employee_id, status="Pending"
+    ).order_by(CertificationApproval.created_at.desc()).all()
     assessments = CompetencyAssessment.query.filter_by(employee_id=employee_id).all()
+    pending_assessments = CompetencyAssessmentApproval.query.filter_by(
+        employee_id=employee_id, status="Pending"
+    ).all()
+    pending_assessment_map = {row.skill_id: row for row in pending_assessments}
     assessment_map = {assessment.skill_id: assessment for assessment in assessments}
     requirements = active_project_requirements(employee_id)
     skills = Skill.query.order_by(Skill.name).all()
@@ -262,6 +270,7 @@ def employee_profile(employee_id):
         "competency/profile.html",
         emp=emp, certs=certs, assessments=assessments, skills=skills,
         competency_rows=competency_rows, assessment_summary=assessment_summary,
+        pending_certs=pending_certs, pending_assessments=pending_assessments,
     )
 
 
@@ -274,10 +283,15 @@ def assess(employee_id):
     skills = Skill.query.order_by(Skill.name).all()
     assessments = CompetencyAssessment.query.filter_by(employee_id=employee_id).all()
     assessment_map = {assessment.skill_id: assessment for assessment in assessments}
+    pending_assessments = CompetencyAssessmentApproval.query.filter_by(
+        employee_id=employee_id, status="Pending"
+    ).all()
+    pending_map = {row.skill_id: row for row in pending_assessments}
     requirements = active_project_requirements(employee_id)
 
     if request.method == "POST":
         saved = 0
+        approval_requests = 0
         for skill in skills:
             raw_current = (request.form.get(f"current_{skill.id}") or "").strip()
             existing = assessment_map.get(skill.id)
@@ -301,22 +315,31 @@ def assess(employee_id):
 
             target_level = requirement["required_level"] if requirement else current_level
             notes = request.form.get(f"notes_{skill.id}", "").strip()
-            if existing:
-                existing.current_level = current_level
+
+            if existing and existing.current_level == current_level:
+                # Notes can be updated without manager approval because the
+                # proficiency level itself did not change.
                 existing.required_level = target_level
                 existing.notes = notes
-                existing.assessed_on = date.today()
+                continue
+
+            pending = pending_map.get(skill.id)
+            if pending:
+                pending.proposed_level = current_level
+                pending.proposed_required_level = target_level
+                pending.notes = notes
+                pending.created_at = datetime.utcnow()
             else:
-                db.session.add(CompetencyAssessment(
+                db.session.add(CompetencyAssessmentApproval(
                     employee_id=employee_id, skill_id=skill.id,
-                    current_level=current_level, required_level=target_level,
-                    assessed_on=date.today(), notes=notes,
+                    proposed_level=current_level, proposed_required_level=target_level,
+                    notes=notes, submitted_by_user_id=current_user.id,
                 ))
-            saved += 1
+            approval_requests += 1
 
         db.session.commit()
-        if saved:
-            flash("Competency assessment saved. Project targets were applied automatically.", "success")
+        if approval_requests:
+            flash(f"{approval_requests} proficiency change(s) submitted for manager approval. Your current levels remain unchanged until approved.", "success")
         else:
             flash("No proficiency changes were submitted.", "info")
         return redirect(url_for("competency.employee_profile", employee_id=employee_id))
@@ -334,6 +357,7 @@ def assess(employee_id):
             "gap": None if not assessment or target is None else max(0, target - assessment.current_level),
             "projects": requirement["projects"] if requirement else [],
             "tasks": requirement["tasks"] if requirement else [],
+            "pending": pending_map.get(skill.id),
         }
         if requirement:
             required_items.append(item)
@@ -353,16 +377,118 @@ def add_cert(employee_id):
     emp = Employee.query.get_or_404(employee_id)
     name = request.form.get("name", "").strip()
     if name:
-        db.session.add(Certification(
-            employee_id=employee_id,
-            name=name,
-            issuer=request.form.get("issuer", ""),
-            issued_date=_date(request.form.get("issued_date")),
-            expiry_date=_date(request.form.get("expiry_date")),
+        issuer = request.form.get("issuer", "").strip()
+        issued_date = _date(request.form.get("issued_date"))
+        expiry_date = _date(request.form.get("expiry_date"))
+        evidence_notes = request.form.get("evidence_notes", "").strip()
+        duplicate = CertificationApproval.query.filter_by(
+            employee_id=employee_id, name=name, issuer=issuer, status="Pending"
+        ).first()
+        if duplicate:
+            flash("This certification is already pending manager approval.", "info")
+            return redirect(url_for("competency.employee_profile", employee_id=employee_id))
+        db.session.add(CertificationApproval(
+            employee_id=employee_id, name=name, issuer=issuer,
+            issued_date=issued_date, expiry_date=expiry_date,
+            evidence_notes=evidence_notes,
+            submitted_by_user_id=current_user.id,
         ))
         db.session.commit()
-        flash("Certification recorded.", "success")
+        flash("Certification submitted for manager approval. It will appear in the official certification list after approval.", "success")
     return redirect(url_for("competency.employee_profile", employee_id=employee_id))
+
+
+@competency_bp.route("/approvals")
+@manager_required
+def approvals():
+    """Manager queue for certification and competency approval requests."""
+    cert_requests = CertificationApproval.query.filter_by(status="Pending").order_by(
+        CertificationApproval.created_at.desc()
+    ).all()
+    assessment_requests = CompetencyAssessmentApproval.query.filter_by(status="Pending").order_by(
+        CompetencyAssessmentApproval.created_at.desc()
+    ).all()
+    return render_template(
+        "competency/approvals.html",
+        cert_requests=cert_requests, assessment_requests=assessment_requests,
+    )
+
+
+def _ensure_external_approval(submitter_id):
+    if submitter_id == current_user.id:
+        flash("A manager cannot approve their own request. Another manager or administrator must review it.", "warning")
+        return False
+    return True
+
+
+@competency_bp.route("/approvals/certifications/<int:approval_id>/<action>", methods=["POST"])
+@manager_required
+def review_certification(approval_id, action):
+    if action not in {"approve", "reject"}:
+        abort(400)
+    approval = CertificationApproval.query.get_or_404(approval_id)
+    if approval.status != "Pending":
+        flash("This certification request has already been reviewed.", "info")
+        return redirect(url_for("competency.approvals"))
+    if not _ensure_external_approval(approval.submitted_by_user_id):
+        return redirect(url_for("competency.approvals"))
+
+    approval.status = "Approved" if action == "approve" else "Rejected"
+    approval.reviewed_by_user_id = current_user.id
+    approval.reviewed_at = datetime.utcnow()
+    if action == "approve":
+        db.session.add(Certification(
+            employee_id=approval.employee_id, name=approval.name, issuer=approval.issuer,
+            issued_date=approval.issued_date, expiry_date=approval.expiry_date,
+        ))
+        flash("Certification approved and posted to the employee profile.", "success")
+    else:
+        flash("Certification request rejected. It was not posted to the employee profile.", "info")
+    db.session.commit()
+    return redirect(url_for("competency.approvals"))
+
+
+@competency_bp.route("/approvals/assessments/<int:approval_id>/<action>", methods=["POST"])
+@manager_required
+def review_assessment(approval_id, action):
+    if action not in {"approve", "reject"}:
+        abort(400)
+    approval = CompetencyAssessmentApproval.query.get_or_404(approval_id)
+    if approval.status != "Pending":
+        flash("This competency request has already been reviewed.", "info")
+        return redirect(url_for("competency.approvals"))
+    if not _ensure_external_approval(approval.submitted_by_user_id):
+        return redirect(url_for("competency.approvals"))
+
+    approval.status = "Approved" if action == "approve" else "Rejected"
+    approval.reviewed_by_user_id = current_user.id
+    approval.reviewed_at = datetime.utcnow()
+    if action == "approve":
+        requirements = active_project_requirements(approval.employee_id)
+        target_level = (
+            requirements.get(approval.skill_id, {}).get("required_level")
+            if requirements.get(approval.skill_id)
+            else approval.proposed_level
+        )
+        existing = CompetencyAssessment.query.filter_by(
+            employee_id=approval.employee_id, skill_id=approval.skill_id
+        ).first()
+        if existing:
+            existing.current_level = approval.proposed_level
+            existing.required_level = target_level
+            existing.notes = approval.notes
+            existing.assessed_on = date.today()
+        else:
+            db.session.add(CompetencyAssessment(
+                employee_id=approval.employee_id, skill_id=approval.skill_id,
+                current_level=approval.proposed_level, required_level=target_level,
+                assessed_on=date.today(), notes=approval.notes,
+            ))
+        flash("Competency change approved and posted to the employee profile.", "success")
+    else:
+        flash("Competency change rejected. The employee's current proficiency remains unchanged.", "info")
+    db.session.commit()
+    return redirect(url_for("competency.approvals"))
 
 
 @competency_bp.route("/skills")

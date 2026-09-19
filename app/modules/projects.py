@@ -5,6 +5,7 @@ milestone management, and project progress monitoring (thesis Fig. 5).
 Manager/Admin create projects & tasks; Employees update their task status.
 """
 from datetime import date, datetime
+import re
 
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
@@ -13,6 +14,7 @@ from ..models import (
     Milestone, Skill, User, CompetencyAssessment,
 )
 from ..decorators import manager_required
+from ..email_service import send_project_completion_email
 
 projects_bp = Blueprint("projects", __name__, url_prefix="/projects")
 
@@ -20,6 +22,11 @@ TASK_STATUSES = ["Backlog", "To Do", "In Progress", "In Review", "Done"]
 TASK_PRIORITIES = ["Low", "Medium", "High"]
 PROJECT_STATUSES = ["Active", "On Hold", "Completed"]
 PROJECT_PRIORITIES = ["Low", "Medium", "High"]
+
+
+def _valid_email(value):
+    """Return True for a basic requester email format."""
+    return bool(re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value or ""))
 
 
 def _can_manage_project(project):
@@ -290,7 +297,9 @@ def create_project():
 
     if request.method == "POST":
         name = request.form.get("name", "").strip()
-        status = request.form.get("status", "Active")
+        requester_email = request.form.get("requester_email", "").strip()
+        # New projects always start as Active. Status is managed after creation.
+        status = "Active"
         priority = request.form.get("priority", "Medium")
         selected_member_ids = {
             int(emp_id) for emp_id in request.form.getlist("members") if emp_id.isdigit()
@@ -335,8 +344,8 @@ def create_project():
                 project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES, employee_capacity=capacity_map,
                 employee_proficiencies=employee_proficiencies,
             )
-        if status not in PROJECT_STATUSES:
-            flash("Invalid project status.", "danger")
+        if not _valid_email(requester_email):
+            flash("A valid requester email is required.", "danger")
             return render_template(
                 "projects/form.html",
                 employees=employees, skills=skills, project=None,
@@ -362,6 +371,7 @@ def create_project():
             manager_id=current_user.id,
             status=status,
             priority=priority,
+            requester_email=requester_email,
             start_date=_date(request.form.get("start_date")),
             target_date=_date(request.form.get("target_date")),
             completed_at=datetime.utcnow() if status == "Completed" else None,
@@ -425,6 +435,7 @@ def edit_project(project_id):
 
     if request.method == "POST":
         name = request.form.get("name", "").strip()
+        requester_email = request.form.get("requester_email", "").strip()
         status = request.form.get("status", project.status)
         priority = request.form.get("priority", project.priority or "Medium")
         posted_member_ids = {
@@ -459,6 +470,18 @@ def edit_project(project_id):
 
         if not name:
             flash("Project name is required.", "danger")
+            return render_template(
+                "projects/form.html",
+                employees=employees, skills=skills, project=project,
+                project_requirements=project_requirements,
+                selected_member_ids=posted_member_ids,
+                project_statuses=PROJECT_STATUSES, project_priorities=PROJECT_PRIORITIES,
+                active_account_employee_ids=active_account_employee_ids,
+                employee_capacity=capacity_map,
+                employee_proficiencies=employee_proficiencies,
+            )
+        if requester_email and not _valid_email(requester_email):
+            flash("Enter a valid requester email address.", "danger")
             return render_template(
                 "projects/form.html",
                 employees=employees, skills=skills, project=project,
@@ -525,14 +548,17 @@ def edit_project(project_id):
         previous_status = project.status
         project.name = name
         project.description = request.form.get("description", "")
+        project.requester_email = requester_email
         project.status = status
         project.priority = priority
         project.start_date = _date(request.form.get("start_date"))
         project.target_date = _date(request.form.get("target_date"))
         if status == "Completed" and previous_status != "Completed":
             project.completed_at = datetime.utcnow()
+            project.completion_email_sent_at = None
         elif status != "Completed" and previous_status == "Completed":
             project.completed_at = None
+            project.completion_email_sent_at = None
 
         affected_employee_ids = selected_member_ids | posted_member_ids
         existing_links = ProjectMember.query.filter_by(project_id=project_id).all()
@@ -545,6 +571,16 @@ def edit_project(project_id):
 
         _replace_project_requirements(project_id, project_requirements)
         db.session.commit()
+
+        if project.status == "Completed" and project.completion_email_sent_at is None:
+            try:
+                send_project_completion_email(project)
+                project.completion_email_sent_at = datetime.utcnow()
+                db.session.commit()
+            except Exception as exc:
+                db.session.rollback()
+                flash(f"Project updated, but the completion email could not be sent: {exc}", "warning")
+
         # Refresh both current and removed members so stale project-driven
         # recommendations are cleared immediately after an edit.
         from .recommendation import _refresh_recommendations
@@ -718,12 +754,37 @@ def create_task(project_id):
 def update_task(task_id):
     task = Task.query.get_or_404(task_id)
 
-    # Employees may update only tasks assigned to their own employee profile.
+    # Employees may request status changes only for tasks assigned to their own
+    # employee profile. The project's manager must approve the change before it
+    # becomes the task's official workflow status.
     if current_user.role == "employee":
         emp = Employee.query.filter_by(user_id=current_user.id).first()
         if not emp or task.assignee_id != emp.id:
             abort(403)
-    elif current_user.role in ("admin", "manager"):
+
+        new_status = request.form.get("status")
+        if new_status not in TASK_STATUSES:
+            flash("Invalid task status.", "danger")
+            return redirect(url_for("projects.detail", project_id=task.project_id))
+        if new_status == task.status:
+            flash(f"Task '{task.title}' is already {new_status}.", "info")
+            return redirect(url_for("projects.detail", project_id=task.project_id))
+        if task.status_change_requested_status:
+            flash("This task already has a status change waiting for manager approval.", "warning")
+            return redirect(url_for("projects.detail", project_id=task.project_id))
+
+        task.status_change_requested_status = new_status
+        task.status_change_requested_by = emp.id
+        task.status_change_requested_at = datetime.utcnow()
+        task.updated_at = datetime.utcnow()
+        db.session.commit()
+        flash(
+            f"Status change for '{task.title}' submitted for manager approval.",
+            "success",
+        )
+        return redirect(url_for("projects.detail", project_id=task.project_id))
+
+    if current_user.role in ("admin", "manager"):
         _require_project_manager(task.project)
     else:
         abort(403)
@@ -747,9 +808,65 @@ def update_task(task_id):
         task.completed_at = None
 
     task.status = new_status
+    task.status_change_requested_status = None
+    task.status_change_requested_by = None
+    task.status_change_requested_at = None
     task.updated_at = now
     db.session.commit()
     flash(f"Task '{task.title}' → {new_status}.", "success")
+    return redirect(url_for("projects.detail", project_id=task.project_id))
+
+
+@projects_bp.route("/task/<int:task_id>/status-request/<string:action>", methods=["POST"])
+@manager_required
+def review_task_status_request(task_id, action):
+    """Approve or reject an employee-submitted task status change."""
+    task = Task.query.get_or_404(task_id)
+    _require_project_manager(task.project)
+
+    if action not in ("approve", "reject"):
+        abort(404)
+
+    requested_status = task.status_change_requested_status
+    if requested_status not in TASK_STATUSES:
+        flash("There is no valid pending status change for this task.", "warning")
+        return redirect(url_for("projects.detail", project_id=task.project_id))
+
+    requester = task.status_change_requester.full_name if task.status_change_requester else "Employee"
+    if action == "reject":
+        task.status_change_requested_status = None
+        task.status_change_requested_by = None
+        task.status_change_requested_at = None
+        task.updated_at = datetime.utcnow()
+        db.session.commit()
+        flash(
+            f"Status change request for '{task.title}' from {requester} was rejected.",
+            "warning",
+        )
+        return redirect(url_for("projects.detail", project_id=task.project_id))
+
+    previous_status = task.status
+    now = datetime.utcnow()
+    if requested_status in ("In Progress", "In Review") and task.started_at is None:
+        task.started_at = now
+    if requested_status == "Done":
+        if task.started_at is None:
+            task.started_at = task.created_at or now
+        if previous_status != "Done" or task.completed_at is None:
+            task.completed_at = now
+    elif previous_status == "Done":
+        task.completed_at = None
+
+    task.status = requested_status
+    task.status_change_requested_status = None
+    task.status_change_requested_by = None
+    task.status_change_requested_at = None
+    task.updated_at = now
+    db.session.commit()
+    flash(
+        f"Status change for '{task.title}' approved: {requested_status}.",
+        "success",
+    )
     return redirect(url_for("projects.detail", project_id=task.project_id))
 
 

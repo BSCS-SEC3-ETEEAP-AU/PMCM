@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}Pending Approvals &middot; SPM&ECD{% endblock %}
+
+{% block page_title %}Pending Approvals{% endblock %}
+
+{% block page_subtitle %}Review pending employee requests{% endblock %}
+
+{% block content %}
+
+<div class="module-toolbar">
+    <div>
+        <strong>Approval Requests</strong>
+    </div>
+
+    <div class="module-toolbar-actions">
+        <a class="btn secondary" href="{{ url_for('competency.overview') }}">
+            Team Competencies
+        </a>
+    </div>
+</div>
+
+<div class="approval-list">
+
+    {# ============================================================
+    CERTIFICATION REQUESTS
+    ============================================================ #}
+
+    {% for item in cert_requests %}
+
+    <article class="approval-row">
+
+        <div class="approval-row-main">
+
+            <div class="approval-type">
+                Certification
+            </div>
+
+            <strong>
+                {{ item.name }}
+            </strong>
+
+            <span>
+                {{ item.employee.full_name }}
+                &middot;
+                {{ item.issuer or 'Issuer not specified' }}
+            </span>
+
+            {% if item.issued_date or item.expiry_date %}
+            <div class="approval-detail-line">
+                <span class="approval-label">Dates</span>
+                <strong>
+                    {% if item.issued_date %}
+                    Issued {{ item.issued_date.strftime('%b %d, %Y') }}
+                    {% endif %}
+                    {% if item.expiry_date %}
+                    {% if item.issued_date %}&middot; {% endif %}
+                    Expires {{ item.expiry_date.strftime('%b %d, %Y') }}
+                    {% endif %}
+                </strong>
+            </div>
+            {% endif %}
+
+            {% if item.evidence_notes %}
+            <div class="approval-evidence">
+                <span class="approval-label">Proof / Certification URL / Notes</span>
+                <div>{{ item.evidence_notes }}</div>
+            </div>
+            {% endif %}
+            <small>
+                Submitted by {{ item.submitted_by.full_name }}
+                &middot;
+                {{ item.created_at.strftime('%b %d, %Y %I:%M %p') }}
+            </small>
+
+        </div>
+
+        <div class="approval-actions">
+
+            {% if item.submitted_by_user_id == current_user.id %}
+
+            <span class="status-pill status-pending">
+                Your request
+            </span>
+
+            {% else %}
+
+            <form method="POST" action="{{ url_for(
+            'competency.review_certification',
+            approval_id=item.id,
+            action='approve'
+          ) }}">
+                <button class="btn small primary" type="submit">
+                    Approve
+                </button>
+            </form>
+
+            <form method="POST" action="{{ url_for(
+            'competency.review_certification',
+            approval_id=item.id,
+            action='reject'
+          ) }}">
+                <button class="btn small secondary" type="submit">
+                    Reject
+                </button>
+            </form>
+
+            {% endif %}
+
+        </div>
+
+    </article>
+
+    {% endfor %}
+
+
+    {# ============================================================
+    COMPETENCY ASSESSMENT REQUESTS
+    ============================================================ #}
+
+    {% for item in assessment_requests %}
+
+    <article class="approval-row">
+
+        <div class="approval-row-main">
+
+            <div class="approval-type">
+                Competency Change
+            </div>
+
+      <strong class="approval-item-title">
+                {{ item.skill.name }}
+            </strong>
+
+      <div class="approval-detail-line">
+        <span class="approval-label">Employee</span>
+        <strong>{{ item.employee.full_name }}</strong>
+      </div>
+
+      <div class="approval-detail-line">
+        <span class="approval-label">Requested proficiency</span>
+        <strong>Level {{ item.proposed_level }}</strong>
+      </div>
+
+            {% if item.proposed_required_level %}
+      <div class="approval-detail-line">
+        <span class="approval-label">Project requirement</span>
+        <strong>Level {{ item.proposed_required_level }}</strong>
+      </div>
+            {% endif %}
+
+            {% if item.notes %}
+            <div class="approval-evidence">
+        <span class="approval-label">Proof / Notes</span>
+        <div>{{ item.notes }}</div>
+            </div>
+            {% endif %}
+
+      <div class="approval-submitted">
+                Submitted by {{ item.submitted_by.full_name }}
+                &middot;
+                {{ item.created_at.strftime('%b %d, %Y %I:%M %p') }}
+      </div>
+
+        </div>
+
+        <div class="approval-actions">
+
+            {% if item.submitted_by_user_id == current_user.id %}
+
+            <span class="status-pill status-pending">
+                Your request
+            </span>
+
+            {% else %}
+
+            <form method="POST" action="{{ url_for(
+            'competency.review_assessment',
+            approval_id=item.id,
+            action='approve'
+          ) }}">
+                <button class="btn small primary" type="submit">
+                    Approve
+                </button>
+            </form>
+
+            <form method="POST" action="{{ url_for(
+            'competency.review_assessment',
+            approval_id=item.id,
+            action='reject'
+          ) }}">
+                <button class="btn small secondary" type="submit">
+                    Reject
+                </button>
+            </form>
+
+            {% endif %}
+
+        </div>
+
+    </article>
+
+    {% endfor %}
+
+
+    {# ============================================================
+    EMPTY STATE
+    ============================================================ #}
+
+    {% if not cert_requests and not assessment_requests %}
+
+    <div class="empty-state">
+        No pending approval requests.
+    </div>
+
+    {% endif %}
+
+</div>
+
+{% endblock %}

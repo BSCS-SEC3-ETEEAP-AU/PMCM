@@ -87,6 +87,29 @@ class Certification(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class CertificationApproval(db.Model):
+    """Manager approval request for an employee certification."""
+    __tablename__ = "certification_approvals"
+
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey("employees.id"), nullable=False)
+    name = db.Column(db.String(160), nullable=False)
+    issuer = db.Column(db.String(120))
+    issued_date = db.Column(db.Date)
+    expiry_date = db.Column(db.Date)
+    evidence_notes = db.Column(db.Text)
+    submitted_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default="Pending")  # Pending | Approved | Rejected
+    reviewed_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    reviewed_at = db.Column(db.DateTime)
+    reviewer_note = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    employee = db.relationship("Employee", foreign_keys=[employee_id])
+    submitted_by = db.relationship("User", foreign_keys=[submitted_by_user_id])
+    reviewed_by = db.relationship("User", foreign_keys=[reviewed_by_user_id])
+
+
 class CompetencyAssessment(db.Model):
     """Recorded proficiency of an employee for a given skill (gap-analysis input)."""
     __tablename__ = "competency_assessments"
@@ -108,6 +131,29 @@ class CompetencyAssessment(db.Model):
         return max(0, self.required_level - self.current_level)
 
 
+class CompetencyAssessmentApproval(db.Model):
+    """Manager approval request for a proposed employee proficiency change."""
+    __tablename__ = "competency_assessment_approvals"
+
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey("employees.id"), nullable=False)
+    skill_id = db.Column(db.Integer, db.ForeignKey("skills.id"), nullable=False)
+    proposed_level = db.Column(db.Integer, nullable=False)
+    proposed_required_level = db.Column(db.Integer, nullable=False)
+    notes = db.Column(db.Text)
+    submitted_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default="Pending")  # Pending | Approved | Rejected
+    reviewed_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    reviewed_at = db.Column(db.DateTime)
+    reviewer_note = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    employee = db.relationship("Employee", foreign_keys=[employee_id])
+    skill = db.relationship("Skill", foreign_keys=[skill_id])
+    submitted_by = db.relationship("User", foreign_keys=[submitted_by_user_id])
+    reviewed_by = db.relationship("User", foreign_keys=[reviewed_by_user_id])
+
+
 class Project(db.Model):
     """Project record (Project Management Module)."""
     __tablename__ = "projects"
@@ -118,6 +164,8 @@ class Project(db.Model):
     manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     status = db.Column(db.String(20), default="Active")  # Active | Completed | On Hold
     priority = db.Column(db.String(20), default="Medium")  # Low | Medium | High
+    requester_email = db.Column(db.String(120))
+    completion_email_sent_at = db.Column(db.DateTime)
     start_date = db.Column(db.Date)
     target_date = db.Column(db.Date)
     completed_at = db.Column(db.DateTime)
@@ -205,9 +253,21 @@ class Task(db.Model):
     completed_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Employee status changes are submitted for manager approval before the
+    # task's official workflow status is changed.
+    status_change_requested_status = db.Column(db.String(20))
+    status_change_requested_by = db.Column(
+        db.Integer, db.ForeignKey("employees.id"), nullable=True
+    )
+    status_change_requested_at = db.Column(db.DateTime)
 
     project = db.relationship("Project", backref="tasks")
-    assignee = db.relationship("Employee", backref="assigned_tasks")
+    status_change_requester = db.relationship(
+        "Employee",
+        foreign_keys=[status_change_requested_by],
+        backref="task_status_requests",
+    )
+    assignee = db.relationship("Employee", foreign_keys=[assignee_id], backref="assigned_tasks")
     required_skill = db.relationship("Skill", backref="required_by_tasks")
 
     @property

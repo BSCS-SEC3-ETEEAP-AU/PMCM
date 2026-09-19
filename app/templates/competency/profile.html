@@ -52,7 +52,9 @@
             <tr>
               <td><strong>{{ row.skill.name }}</strong><small class="module-cell-sub">{{ row.skill.category or 'General' }}</small></td>
               <td>
-                {% if a %}
+                {% if pending_assessments|selectattr('skill_id', 'equalto', row.skill.id)|list|length %}
+                  <span class="status-pill status-pending">Pending Approval</span>
+                {% elif a %}
                   <span class="proficiency-stars" aria-label="Level {{ a.current_level }} of 5">
                     {% for i in range(1, 6) %}<span class="{% if i <= a.current_level %}filled{% endif %}">★</span>{% endfor %}
                   </span>
@@ -96,6 +98,16 @@
 <section id="tab-certifications" class="profile-tab-panel" hidden>
   <article class="module-panel">
     <div class="module-panel-head"><div><h2>Certifications</h2><p>Professional credentials associated with this employee profile</p></div></div>
+    {% if pending_certs %}
+    <div class="pending-approval-panel">
+      <div><strong>Pending certification approvals</strong><span>These credentials are waiting for manager validation and are not yet posted as official certifications.</span></div>
+      <div class="pending-cert-list">
+        {% for c in pending_certs %}
+        <div class="pending-cert-row"><div><strong>{{ c.name }}</strong><span>{{ c.issuer or 'Issuer not specified' }}</span></div><span class="status-pill status-pending">Pending Approval</span></div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
     <div class="cert-card-list">
       {% for c in certs %}
       <div class="cert-card-row">
@@ -112,6 +124,10 @@
       <input type="text" name="issuer" placeholder="Issuer">
       <label><span>Issued</span><input type="date" name="issued_date"></label>
       <label><span>Expiry</span><input type="date" name="expiry_date"></label>
+      <label class="cert-evidence-field">
+        <span>Proof / Certification URL / Notes <em>(optional)</em></span>
+        <textarea name="evidence_notes" rows="3" placeholder="Paste certification URL or add certificate ID, proof, or notes"></textarea>
+      </label>
       <button class="btn" type="submit">+ Add Certification</button>
     </form>
   </article>

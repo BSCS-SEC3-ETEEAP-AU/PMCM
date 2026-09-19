@@ -5,7 +5,7 @@
 {% block page_subtitle %}{% if is_self %}Rate your current proficiency. Project targets are applied automatically from your assigned work.{% else %}Record current proficiency for {{ emp.full_name }}. Project targets are applied automatically from assigned work.{% endif %}{% endblock %}
 
 {% macro proficiency_select(item) -%}
-<select class="assessment-level-select" name="current_{{ item.skill.id }}" data-target="{{ item.target or '' }}" aria-label="Current proficiency for {{ item.skill.name }}">
+<select class="assessment-level-select" name="current_{{ item.skill.id }}" data-target="{{ item.target or '' }}" aria-label="Current proficiency for {{ item.skill.name }}" {% if item.pending %}disabled{% endif %}>
   <option value="">Not Assessed</option>
   {% for level, label in [(1, 'Beginner'), (2, 'Basic'), (3, 'Intermediate'), (4, 'Advanced'), (5, 'Expert')] %}
     <option value="{{ level }}" {% if item.assessment and item.assessment.current_level == level %}selected{% endif %}>{{ level }} — {{ label }}</option>
@@ -20,14 +20,14 @@
       <h3>{{ item.skill.name }}</h3>
       <span class="category-badge category-{{ (item.skill.category or 'general')|lower|replace(' ', '-') }}">{{ item.skill.category or 'General' }}</span>
     </div>
-    {% if required %}<span class="assessment-required-pill">Required for active work</span>{% else %}<span class="assessment-optional-pill">Additional competency</span>{% endif %}
+    {% if item.pending %}<span class="assessment-pending-pill">Pending manager approval</span>{% elif required %}<span class="assessment-required-pill">Required for active work</span>{% else %}<span class="assessment-optional-pill">Additional competency</span>{% endif %}
   </div>
 
   <div class="assessment-fields">
     <label class="assessment-field">
       <span>Current Proficiency</span>
       {{ proficiency_select(item) }}
-      <small>{% if item.assessment and item.assessment.assessed_on %}Last assessed {{ item.assessment.assessed_on.strftime('%b %d, %Y') }}{% else %}No assessment recorded yet{% endif %}</small>
+      <small>{% if item.pending %}Proposed Level {{ item.pending.proposed_level }} is waiting for manager approval.{% elif item.assessment and item.assessment.assessed_on %}Last assessed {{ item.assessment.assessed_on.strftime('%b %d, %Y') }}{% else %}No assessment recorded yet{% endif %}</small>
     </label>
 
     <div class="assessment-field assessment-readonly">
@@ -57,6 +57,10 @@
       <input type="text" name="notes_{{ item.skill.id }}" value="{{ item.assessment.notes if item.assessment and item.assessment.notes else '' }}" placeholder="Add assessment context or evidence">
     </label>
   </div>
+
+  {% if item.pending %}
+  <div class="assessment-pending-note">A proficiency change is pending manager approval. Your current saved level remains unchanged until the request is approved.</div>
+  {% endif %}
 
   {% if required %}
   <div class="assessment-source">

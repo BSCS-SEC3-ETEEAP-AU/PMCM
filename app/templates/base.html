@@ -117,7 +117,7 @@
               <div class="notif-dropdown-head">
                 <div>
                   <strong>Notifications</strong>
-                  <small>{% if current_user.role == 'admin' %}Account requests and upcoming deadlines{% else %}Upcoming project deadlines{% endif %}</small>
+                  <small>{% if current_user.role == 'admin' %}Account requests, task approvals and deadlines{% elif current_user.role == 'manager' %}Task approvals and upcoming project deadlines{% else %}Your task status requests and project deadlines{% endif %}</small>
                 </div>
                 {% if shell_notification_count %}<span>{{ shell_notification_count }}</span>{% endif %}
               </div>
@@ -132,6 +132,22 @@
                       <small>{{ item.request_type }} · {{ item.requester_name }} · {{ item.created_at.strftime('%b %d, %Y') }}</small>
                     </span>
                   </a>
+                  {% elif item.kind == 'task_status_request' %}
+                  <a class="notif-item" href="{{ url_for('projects.detail', project_id=item.project_id) }}">
+                    <span class="notif-dot notif-dot-alert"></span>
+                    <span class="notif-item-copy">
+                      <strong>{{ item.title }}</strong>
+                      <small>{{ item.task_title }} → {{ item.requested_status }} · {{ item.requester_name }}</small>
+                    </span>
+                  </a>
+                  {% elif item.kind == 'competency_approval' %}
+                  <a class="notif-item" href="{{ url_for('competency.approvals') }}">
+                    <span class="notif-dot notif-dot-alert"></span>
+                    <span class="notif-item-copy">
+                      <strong>{{ item.title }}</strong>
+                      <small>{{ item.subtitle }} · {{ item.created_at.strftime('%b %d, %Y') }}</small>
+                    </span>
+                  </a>
                   {% else %}
                   <a class="notif-item" href="{{ url_for('projects.detail', project_id=item.project_id) }}">
                     <span class="notif-dot"></span>
@@ -144,7 +160,7 @@
                 {% else %}
                 <div class="notif-empty">
                   <strong>You're all caught up</strong>
-                  <small>No account requests or upcoming project milestones require your attention.</small>
+                  <small>No account requests, task approvals, or upcoming project milestones require your attention.</small>
                 </div>
                 {% endfor %}
               </div>
@@ -152,6 +168,9 @@
               <div class="notif-footer-actions">
                 {% if current_user.role == 'admin' and shell_account_request_count %}
                 <a class="notif-footer-link" href="{{ url_for('auth.account_requests') }}">Account requests ({{ shell_account_request_count }})</a>
+                {% endif %}
+                {% if current_user.role in ('admin', 'manager') and competency_approval_count|default(0) %}
+                <a class="notif-footer-link" href="{{ url_for('competency.approvals') }}">Pending competency approvals ({{ competency_approval_count }})</a>
                 {% endif %}
                 <a class="notif-footer-link" href="{{ url_for('projects.list_projects') }}">View projects →</a>
               </div>
