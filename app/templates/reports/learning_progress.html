@@ -15,25 +15,28 @@
     <label><span>Recommended From</span><input type="date" name="date_from" value="{{ date_from.isoformat() if date_from else '' }}"></label>
     <label><span>Recommended To</span><input type="date" name="date_to" value="{{ date_to.isoformat() if date_to else '' }}"></label>
   </div>
-  <div class="report-filter-actions"><a class="btn secondary" href="{{ url_for('reports.learning_progress') }}">Clear</a><button class="btn secondary" type="submit" name="export" value="csv">Export CSV</button><button class="btn primary" type="submit">Apply Filters</button></div>
+  <div class="report-filter-actions"><a class="btn secondary" href="{{ url_for('reports.learning_progress') }}">Clear</a><button class="btn primary" type="submit" name="export" value="pdf">Download PDF</button><button class="btn secondary" type="submit" name="export" value="csv">Export CSV</button><button class="btn primary" type="submit">Apply Filters</button></div>
 </form>
-
-<section class="module-kpi-row report-detail-kpis">
-  <div class="module-kpi-card mk-blue"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5.5c2.8-.8 5.3-.3 8 1.5v12c-2.7-1.8-5.2-2.3-8-1.5v-12Z"/><path d="M20 5.5c-2.8-.8-5.3-.3-8 1.5v12c2.7-1.8 5.2-2.3 8-1.5v-12Z"/></svg></span><div><span class="module-kpi-label">Activities</span><strong>{{ summary.total }}</strong><small>Filtered learning records</small></div></div>
-  <div class="module-kpi-card mk-violet"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M8.5 14.8A6 6 0 1 1 15.5 14.8c-.9.7-1.3 1.4-1.5 2.2h-4c-.2-.8-.6-1.5-1.5-2.2Z"/></svg></span><div><span class="module-kpi-label">Recommended</span><strong>{{ summary.recommended }}</strong><small>Not started</small></div></div>
-  <div class="module-kpi-card mk-amber"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/><path d="M7 4.8 5.2 3"/></svg></span><div><span class="module-kpi-label">In Progress</span><strong>{{ summary.in_progress }}</strong><small>Currently learning</small></div></div>
-  <div class="module-kpi-card mk-green"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg></span><div><span class="module-kpi-label">Completed</span><strong>{{ summary.completed }}</strong><small>{{ summary.completion }}% completion rate</small></div></div>
-</section>
-
-<section class="module-panel report-table-panel">
-  <div class="module-panel-head"><div><h2>Learning Results</h2><p>Completion records remain learning history; competency changes require reassessment</p></div></div>
-  <div class="table-scroll"><table class="data-table report-data-table learning-report-table">
-    <thead><tr><th>Employee</th><th>Team</th><th>Learning Resource</th><th>Skill</th><th>Provider / Access</th><th>Status</th><th>Gap</th><th>Recommended</th><th>Completed</th></tr></thead>
-    <tbody>{% for r in rows %}<tr>
-      <td><strong>{{ r.employee }}</strong></td><td>{{ r.team }}</td><td>{{ r.resource }}</td><td>{{ r.skill }}</td>
-      <td>{{ r.provider }}<small class="report-subtext">{{ r.access }}</small></td><td><span class="report-status report-status-{{ r.status|lower|replace(' ','-') }}">{{ r.status }}</span></td>
-      <td>{% if r.gap is none %}Assessment Needed{% else %}{{ r.gap }} level{{ '' if r.gap == 1 else 's' }}{% endif %}</td><td>{{ r.created_at.strftime('%b %d, %Y') if r.created_at else '—' }}</td><td>{{ r.completed_at.strftime('%b %d, %Y') if r.completed_at else '—' }}</td>
-    </tr>{% else %}<tr><td colspan="9"><div class="empty-state">No learning records match the selected filters.</div></td></tr>{% endfor %}</tbody>
-  </table></div>
+{% from "reports/_executive_macros.html" import kpis, section, bar %}
+<section class="executive-report-body">
+  {{ section('Learning Snapshot', 'A management view of employee learning activity and development progress.') }}
+  {{ kpis([
+    {'label':'Activities','value':summary.total,'note':'Filtered learning records','accent':'blue'},
+    {'label':'Recommended','value':summary.recommended,'note':'Not started','accent':'violet'},
+    {'label':'In Progress','value':summary.in_progress,'note':'Currently learning','accent':'amber'},
+    {'label':'Completed','value':summary.completed,'note':summary.completion ~ '% completion rate','accent':'green'}
+  ]) }}
+  <div class="executive-two-column">
+    <article class="executive-card executive-chart-card">{{ section('Learning Status') }}{{ bar('Recommended', summary.recommended, summary.total or 1, 'violet', 'activities') }}{{ bar('In Progress', summary.in_progress, summary.total or 1, 'amber', 'activities') }}{{ bar('Completed', summary.completed, summary.total or 1, 'green', 'activities') }}</article>
+    <article class="executive-card executive-highlight-card">{{ section('Completion Signal') }}<div class="executive-highlight-number">{{ summary.completion }}%</div><strong>Learning completion rate</strong><p>Completion reflects recorded learning activity in the selected reporting scope.</p></article>
+  </div>
+  {{ section('Learning Portfolio', 'Learning resources are presented as development cards rather than a spreadsheet-style listing.') }}
+  <div class="executive-learning-grid">
+    {% for r in rows %}<article class="executive-learning-card">
+      <div class="executive-card-heading"><div><span class="executive-eyebrow">{{ r.status }}</span><h3>{{ r.resource }}</h3><p>{{ r.employee }} · {{ r.team }}</p></div><span class="report-status report-status-{{ r.status|lower|replace(' ','-') }}">{{ r.status }}</span></div>
+      <div class="executive-learning-skill"><strong>{{ r.skill }}</strong><span>{% if r.gap is none %}Assessment Needed{% else %}{{ r.gap }} level{{ '' if r.gap == 1 else 's' }} gap{% endif %}</span></div>
+      <div class="executive-card-footer"><span>{{ r.provider }} · {{ r.access }}</span><span>{{ r.created_at.strftime('%b %d, %Y') if r.created_at else '—' }}</span></div>
+    </article>{% else %}<div class="empty-state">No learning records match the selected filters.</div>{% endfor %}
+  </div>
 </section>
 {% endblock %}

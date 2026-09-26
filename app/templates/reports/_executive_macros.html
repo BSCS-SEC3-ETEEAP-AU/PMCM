@@ -1,0 +1,16 @@
+{% macro kpis(items) %}
+<section class="executive-kpi-grid">
+  {% for item in items %}<div class="executive-kpi executive-kpi-{{ item.accent }}">
+    <span>{{ item.label }}</span><strong>{{ item.value }}</strong><small>{{ item.note }}</small>
+  </div>{% endfor %}
+</section>
+{% endmacro %}
+
+{% macro section(title, subtitle='') %}<div class="executive-section-head"><div><h2>{{ title }}</h2>{% if subtitle %}<p>{{ subtitle }}</p>{% endif %}</div></div>{% endmacro %}
+
+{% macro bar(label, value, max_value=100, accent='teal', note='') %}
+<div class="executive-bar-row">
+  <div class="executive-bar-label"><strong>{{ label }}</strong><span>{{ value }}{% if max_value == 100 %}%{% endif %}{% if note %} · {{ note }}{% endif %}</span></div>
+  <div class="executive-bar-track"><span class="executive-bar-fill executive-bar-{{ accent }}" style="--bar-width: {{ ((value / max_value * 100) if max_value else 0)|round(0, 'common') }}%"></span></div>
+</div>
+{% endmacro %}

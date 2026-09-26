@@ -19,6 +19,8 @@ from ..models import (
     Employee,
     LearningRecommendation,
     LearningResource,
+    Project,
+    ProjectMember,
     Skill,
     db,
 )
@@ -79,6 +81,111 @@ def _refresh_recommendations(employee_ids):
             for assessment in CompetencyAssessment.query.filter_by(employee_id=emp.id).all()
         }
         requirements = active_project_requirements(emp.id)
+
+        # When an employee has no active project requirements, use a broader
+        # development-oriented recommendation pool. Assessed skills below Level 5
+        # receive targeted resources, while skills without an assessment can still
+        # surface learning resources without inventing a competency gap.
+        if not requirements:
+            active_project_count = (
+                db.session.query(ProjectMember.project_id)
+                .join(Project, Project.id == ProjectMember.project_id)
+                .filter(
+                    ProjectMember.employee_id == emp.id,
+                    Project.status == "Active",
+                )
+                .count()
+            )
+            if active_project_count == 0:
+                assessed_skill_ids = set(assessment_map)
+
+                # First, recommend resources that can raise an assessed skill.
+                for skill_id, assessment in assessment_map.items():
+                    current_level = int(assessment.current_level or 0)
+                    if current_level >= 5:
+                        continue
+
+                    matched = [
+                        resource for resource in resources
+                        if resource.skill_id == skill_id
+                        and resource.target_level > current_level
+                    ]
+                    skill = assessment.skill or skills.get(skill_id)
+                    if not skill:
+                        continue
+
+                    for resource in matched:
+                        pair = (emp.id, resource.id, skill_id)
+                        valid_pairs.add(pair)
+                        gap = max(0, resource.target_level - current_level)
+                        reason = (
+                            f"No active project assignment. Strengthen {skill.name} "
+                            f"from Level {current_level} toward Level {resource.target_level} "
+                            "through this learning resource."
+                        )
+                        existing = (
+                            LearningRecommendation.query
+                            .filter_by(employee_id=emp.id, resource_id=resource.id, skill_id=skill_id)
+                            .filter(LearningRecommendation.status != "Completed")
+                            .order_by(LearningRecommendation.id)
+                            .first()
+                        )
+                        if existing:
+                            existing.gap = gap
+                            existing.reason = reason
+                            updated += 1
+                        else:
+                            db.session.add(LearningRecommendation(
+                                employee_id=emp.id,
+                                resource_id=resource.id,
+                                skill_id=skill_id,
+                                gap=gap,
+                                reason=reason,
+                                status="Recommended",
+                            ))
+                            created += 1
+
+                # Then broaden the pool with resources for skills that have no
+                # recorded assessment. These are intentionally shown as
+                # "Assessment Needed" rather than using an invented gap.
+                for resource in resources:
+                    skill_id = resource.skill_id
+                    if skill_id in assessed_skill_ids:
+                        continue
+
+                    skill = resource.skill or skills.get(skill_id)
+                    if not skill:
+                        continue
+
+                    pair = (emp.id, resource.id, skill_id)
+                    valid_pairs.add(pair)
+                    reason = (
+                        f"No active project assignment. Explore {skill.name} "
+                        "to build this competency while you are available for development. "
+                        f"This resource targets Level {resource.target_level}; assess your "
+                        "proficiency to track your development gap."
+                    )
+                    existing = (
+                        LearningRecommendation.query
+                        .filter_by(employee_id=emp.id, resource_id=resource.id, skill_id=skill_id)
+                        .filter(LearningRecommendation.status != "Completed")
+                        .order_by(LearningRecommendation.id)
+                        .first()
+                    )
+                    if existing:
+                        existing.gap = None
+                        existing.reason = reason
+                        updated += 1
+                    else:
+                        db.session.add(LearningRecommendation(
+                            employee_id=emp.id,
+                            resource_id=resource.id,
+                            skill_id=skill_id,
+                            gap=None,
+                            reason=reason,
+                            status="Recommended",
+                        ))
+                        created += 1
 
         for skill_id, requirement in requirements.items():
             assessment = assessment_map.get(skill_id)
@@ -207,6 +314,16 @@ def my_recommendations():
 
         # Personal recommendations refresh automatically when My Learning opens.
         # The same scoped operation is also available through the manual button.
+        has_active_project = (
+            db.session.query(ProjectMember.project_id)
+            .join(Project, Project.id == ProjectMember.project_id)
+            .filter(
+                ProjectMember.employee_id == emp.id,
+                Project.status == "Active",
+            )
+            .first()
+            is not None
+        )
         _refresh_recommendations([emp.id])
         recs = LearningRecommendation.query.filter_by(employee_id=emp.id).all()
         return render_template(
@@ -215,6 +332,7 @@ def my_recommendations():
             own=True,
             view_mode="my",
             linked_employee=emp,
+            no_active_project=not has_active_project,
         )
 
     recs = LearningRecommendation.query.all()
@@ -224,6 +342,7 @@ def my_recommendations():
         own=False,
         view_mode="team",
         linked_employee=_linked_employee(),
+        no_active_project=False,
     )
 
 

@@ -817,6 +817,42 @@ def update_task(task_id):
     return redirect(url_for("projects.detail", project_id=task.project_id))
 
 
+@projects_bp.route("/task/<int:task_id>/reassign", methods=["POST"])
+@manager_required
+def reassign_task(task_id):
+    """Reassign a task to another active member of its project."""
+    task = Task.query.get_or_404(task_id)
+    _require_project_manager(task.project)
+
+    assignee_id = int(request.form.get("assignee_id") or 0)
+    assignee = (
+        Employee.query
+        .join(User, User.id == Employee.user_id)
+        .filter(Employee.id == assignee_id, User.is_active.is_(True))
+        .first()
+    )
+    is_project_member = ProjectMember.query.filter_by(
+        project_id=task.project_id, employee_id=assignee_id
+    ).first()
+
+    if not assignee or not is_project_member:
+        flash("Tasks can only be reassigned to active-account members of this project.", "danger")
+        return redirect(url_for("projects.detail", project_id=task.project_id))
+
+    if task.assignee_id == assignee.id:
+        flash(f"Task '{task.title}' is already assigned to {assignee.full_name}.", "info")
+        return redirect(url_for("projects.detail", project_id=task.project_id))
+
+    previous_assignee = task.assignee.full_name if task.assignee else "Unassigned"
+    task.assignee_id = assignee.id
+    task.updated_at = datetime.utcnow()
+    db.session.commit()
+    flash(
+        f"Task '{task.title}' reassigned from {previous_assignee} to {assignee.full_name}.",
+        "success",
+    )
+    return redirect(url_for("projects.detail", project_id=task.project_id))
+
 @projects_bp.route("/task/<int:task_id>/status-request/<string:action>", methods=["POST"])
 @manager_required
 def review_task_status_request(task_id, action):

@@ -70,6 +70,20 @@
           <span class="prio prio-{{ t.priority|lower }}">{{ t.priority }}</span>
           {% if t.assignee %}<span class="task-assignee">{{ t.assignee.full_name }}</span>{% else %}<span class="task-assignee muted">Unassigned</span>{% endif %}
         </div>
+        {% if can_manage_project %}
+        <details class="task-reassign-details">
+          <summary>Reassign</summary>
+          <form class="task-reassign-form" method="POST" action="{{ url_for('projects.reassign_task', task_id=t.id) }}">
+            <label for="task-assignee-{{ t.id }}">Project member</label>
+            <select id="task-assignee-{{ t.id }}" name="assignee_id" required>
+              {% for e in employees %}
+              <option value="{{ e.id }}" {% if t.assignee_id == e.id %}selected{% endif %}>{{ e.full_name }}</option>
+              {% endfor %}
+            </select>
+            <button class="btn small primary" type="submit">Save Assignment</button>
+          </form>
+        </details>
+        {% endif %}
         {% if t.required_skill %}
         <div class="task-skill-line">
           <span>{{ t.required_skill.name }}</span>

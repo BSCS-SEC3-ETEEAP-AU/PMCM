@@ -15,27 +15,28 @@
     <label><span>Assessed From</span><input type="date" name="date_from" value="{{ date_from.isoformat() if date_from else '' }}"></label>
     <label><span>Assessed To</span><input type="date" name="date_to" value="{{ date_to.isoformat() if date_to else '' }}"></label>
   </div>
-  <div class="report-filter-actions"><a class="btn secondary" href="{{ url_for('reports.competency_report') }}">Clear</a><button class="btn secondary" type="submit" name="export" value="csv">Export CSV</button><button class="btn primary" type="submit">Apply Filters</button></div>
+  <div class="report-filter-actions"><a class="btn secondary" href="{{ url_for('reports.competency_report') }}">Clear</a><button class="btn primary" type="submit" name="export" value="pdf">Download PDF</button><button class="btn secondary" type="submit" name="export" value="csv">Export CSV</button><button class="btn primary" type="submit">Apply Filters</button></div>
 </form>
-
-<section class="module-kpi-row report-detail-kpis">
-  <div class="module-kpi-card mk-blue"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.8 18c.6-3.1 2.3-4.7 5.2-4.7s4.6 1.6 5.2 4.7"/><circle cx="16.5" cy="9" r="2.2"/><path d="M15.2 13.8c2.7-.3 4.5 1.1 5 4.2"/></svg></span><div><span class="module-kpi-label">Employees</span><strong>{{ summary.employees }}</strong><small>Shown in results</small></div></div>
-  <div class="module-kpi-card mk-violet"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="m15 9 5-5"/><path d="M17 4h3v3"/></svg></span><div><span class="module-kpi-label">Requirements</span><strong>{{ summary.requirements }}</strong><small>Active project targets</small></div></div>
-  <div class="module-kpi-card mk-amber"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4 3.5 19h17L12 4Z"/><path d="M12 9v4"/><path d="M12 16.5h.01"/></svg></span><div><span class="module-kpi-label">Open Gaps</span><strong>{{ summary.open_gaps }}</strong><small>Gap or not assessed</small></div></div>
-  <div class="module-kpi-card mk-green"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 18a7 7 0 1 1 14 0"/><path d="m12 14 3-3"/><path d="M7.5 15h.01M16.5 15h.01M12 8h.01"/></svg></span><div><span class="module-kpi-label">Coverage</span><strong>{{ summary.coverage }}%</strong><small>Requirements met</small></div></div>
-</section>
-
-<section class="module-panel report-table-panel">
-  <div class="module-panel-head"><div><h2>Competency Results</h2><p>Project-driven targets remain synchronized with competency profiles and recommendations</p></div></div>
-  <div class="table-scroll"><table class="data-table report-data-table competency-report-table">
-    <thead><tr><th>Employee</th><th>Team / Position</th><th>Skill</th><th>Current</th><th>Project Target</th><th>Gap</th><th>Status</th><th>Required By</th><th>Last Assessed</th></tr></thead>
-    <tbody>{% for r in rows %}<tr>
-      <td><strong>{{ r.employee }}</strong></td><td>{{ r.team }}<small class="report-subtext">{{ r.position }}</small></td><td>{{ r.skill }}</td>
-      <td>{% if r.current is not none %}Level {{ r.current }}{% else %}<span class="report-muted">Not Assessed</span>{% endif %}</td>
-      <td>{% if r.target is not none %}Level {{ r.target }}{% else %}<span class="report-muted">—</span>{% endif %}</td>
-      <td>{% if r.gap is not none %}<span class="gap-badge {% if r.gap == 0 %}gap-zero{% endif %}">{{ r.gap }}</span>{% else %}—{% endif %}</td>
-      <td><span class="report-status report-status-{{ r.status|lower|replace(' ','-') }}">{{ r.status }}</span></td><td>{{ r.required_by }}</td><td>{{ r.assessed_on.strftime('%b %d, %Y') if r.assessed_on else '—' }}</td>
-    </tr>{% else %}<tr><td colspan="9"><div class="empty-state">No competency records match the selected filters.</div></td></tr>{% endfor %}</tbody>
-  </table></div>
+{% from "reports/_executive_macros.html" import kpis, section, bar %}
+<section class="executive-report-body">
+  {{ section('Competency Snapshot', 'A management view of workforce readiness against active project requirements.') }}
+  {{ kpis([
+    {'label':'Employees','value':summary.employees,'note':'Shown in results','accent':'blue'},
+    {'label':'Requirements','value':summary.requirements,'note':'Active project targets','accent':'violet'},
+    {'label':'Open Gaps','value':summary.open_gaps,'note':'Gap or not assessed','accent':'amber'},
+    {'label':'Coverage','value':summary.coverage ~ '%','note':'Requirements met','accent':'green'}
+  ]) }}
+  <div class="executive-two-column">
+    <article class="executive-card executive-chart-card">{{ section('Requirement Coverage') }}{{ bar('Requirements met', summary.coverage, 100, 'green', 'coverage') }}{{ bar('Open or unassessed', 100-summary.coverage, 100, 'amber', 'coverage') }}</article>
+    <article class="executive-card executive-highlight-card">{{ section('Development Signal') }}<div class="executive-highlight-number">{{ summary.open_gaps }}</div><strong>Open competency gaps</strong><p>These records represent requirements that are below target or not yet assessed in the selected scope.</p></article>
+  </div>
+  {{ section('Competency Review', 'Priority information is shown first; detailed tabular data remains available through Export CSV.') }}
+  <div class="executive-competency-grid">
+    {% for r in rows %}<article class="executive-competency-card">
+      <div class="executive-card-heading"><div><span class="executive-eyebrow">{{ r.status }}</span><h3>{{ r.skill }}</h3><p>{{ r.employee }} · {{ r.team }}{% if r.position %} · {{ r.position }}{% endif %}</p></div><strong>{% if r.gap is not none %}{% if r.gap > 0 %}+{{ r.gap }}{% else %}0{% endif %}{% else %}—{% endif %}</strong></div>
+      <div class="executive-levels"><div><span>Current</span><strong>{% if r.current is not none %}Level {{ r.current }}{% else %}Not Assessed{% endif %}</strong></div><div class="executive-level-arrow">→</div><div><span>Project Target</span><strong>{% if r.target is not none %}Level {{ r.target }}{% else %}—{% endif %}</strong></div></div>
+      <div class="executive-card-footer"><span>Required by: {{ r.required_by }}</span><span>{{ r.assessed_on.strftime('%b %d, %Y') if r.assessed_on else 'Not assessed' }}</span></div>
+    </article>{% else %}<div class="empty-state">No competency records match the selected filters.</div>{% endfor %}
+  </div>
 </section>
 {% endblock %}

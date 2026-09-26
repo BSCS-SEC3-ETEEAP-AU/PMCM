@@ -16,26 +16,45 @@
     <label><span>Target From</span><input type="date" name="date_from" value="{{ date_from.isoformat() if date_from else '' }}"></label>
     <label><span>Target To</span><input type="date" name="date_to" value="{{ date_to.isoformat() if date_to else '' }}"></label>
   </div>
-  <div class="report-filter-actions"><a class="btn secondary" href="{{ url_for('reports.project_status') }}">Clear</a><button class="btn secondary" type="submit" name="export" value="csv">Export CSV</button><button class="btn primary" type="submit">Apply Filters</button></div>
+  <div class="report-filter-actions"><a class="btn secondary" href="{{ url_for('reports.project_status') }}">Clear</a><button class="btn primary" type="submit" name="export" value="pdf">Download PDF</button><button class="btn secondary" type="submit" name="export" value="csv">Export CSV</button><button class="btn primary" type="submit">Apply Filters</button></div>
 </form>
+{% from "reports/_executive_macros.html" import kpis, section, bar %}
+<section class="executive-report-body">
+  {{ section('Portfolio Snapshot', 'A management view of project delivery, current status and schedule exposure.') }}
+  {{ kpis([
+    {'label':'Projects','value':summary.projects,'note':'Filtered projects','accent':'blue'},
+    {'label':'Active','value':summary.active,'note':'Currently active','accent':'green'},
+    {'label':'Completed','value':summary.completed,'note':'Completed projects','accent':'violet'},
+    {'label':'Average Progress','value':summary.avg_progress ~ '%','note':'Task completion','accent':'amber'}
+  ]) }}
 
-<section class="module-kpi-row report-detail-kpis">
-  <div class="module-kpi-card mk-blue"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3.5 7.5h6l1.5 2h9.5v8.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V7.5Z"/><path d="M3.5 7.5V6a2 2 0 0 1 2-2h4l1.5 2h7.5a2 2 0 0 1 2 2v1.5"/></svg></span><div><span class="module-kpi-label">Projects</span><strong>{{ summary.projects }}</strong><small>Filtered projects</small></div></div>
-  <div class="module-kpi-card mk-green"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.8 1.8"/><path d="M16.8 5.2 18.5 3.5"/></svg></span><div><span class="module-kpi-label">Active</span><strong>{{ summary.active }}</strong><small>Currently active</small></div></div>
-  <div class="module-kpi-card mk-violet"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg></span><div><span class="module-kpi-label">Completed</span><strong>{{ summary.completed }}</strong><small>Completed projects</small></div></div>
-  <div class="module-kpi-card mk-amber"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4a8 8 0 1 0 8 8"/><path d="M12 4v8h8"/></svg></span><div><span class="module-kpi-label">Average Progress</span><strong>{{ summary.avg_progress }}%</strong><small>Task completion</small></div></div>
-</section>
+  <div class="executive-two-column">
+    <article class="executive-card executive-chart-card">
+      {{ section('Project Status Distribution') }}
+      <div class="executive-status-stack">
+        {{ bar('Active', summary.active, summary.projects or 1, 'green', 'projects') }}
+        {{ bar('Completed', summary.completed, summary.projects or 1, 'violet', 'projects') }}
+        {{ bar('On Hold', summary.on_hold, summary.projects or 1, 'amber', 'projects') }}
+      </div>
+    </article>
+    <article class="executive-card executive-highlight-card">
+      {{ section('Management View', 'Use the filtered portfolio to identify delivery pressure and upcoming dates.') }}
+      <div class="executive-highlight-number">{{ summary.avg_progress }}%</div>
+      <strong>Average task completion</strong>
+      <p>{% if summary.avg_progress >= 80 %}Most filtered work is approaching completion.{% elif summary.avg_progress >= 50 %}The portfolio is in active delivery and should be monitored against upcoming deadlines.{% else %}The portfolio has substantial work remaining and may require schedule attention.{% endif %}</p>
+    </article>
+  </div>
 
-<section class="module-panel report-table-panel">
-  <div class="module-panel-head"><div><h2>Project Results</h2><p>{{ rows|length }} project{{ '' if rows|length == 1 else 's' }} match the current filters</p></div></div>
-  <div class="table-scroll"><table class="data-table report-data-table">
-    <thead><tr><th>Project</th><th>Manager</th><th>Status</th><th>Start</th><th>Target</th><th>Tasks</th><th>Progress</th><th>Open Milestones</th><th>Next Deadline</th></tr></thead>
-    <tbody>{% for r in rows %}<tr>
-      <td><strong>{{ r.project }}</strong></td><td>{{ r.manager }}</td><td><span class="status-pill status-{{ r.status|lower|replace(' ','') }}">{{ r.status }}</span></td>
-      <td>{{ r.start_date.strftime('%b %d, %Y') if r.start_date else '—' }}</td><td>{{ r.target_date.strftime('%b %d, %Y') if r.target_date else '—' }}</td>
-      <td>{{ r.done }} / {{ r.total_tasks }}</td><td><div class="report-progress-cell"><div class="coverage-track"><span class="u-dynamic-width" style="--dynamic-width: {{ r.progress }}%"></span></div><strong>{{ r.progress }}%</strong></div></td>
-      <td>{{ r.open_milestones }}</td><td>{{ r.next_deadline.strftime('%b %d, %Y') if r.next_deadline else '—' }}</td>
-    </tr>{% else %}<tr><td colspan="9"><div class="empty-state">No projects match the selected filters.</div></td></tr>{% endfor %}</tbody>
-  </table></div>
+  {{ section('Project Portfolio', 'Each project is presented as a management card; detailed row-level data remains available through Export CSV.') }}
+  <div class="executive-project-grid">
+    {% for r in rows %}
+    <article class="executive-project-card">
+      <div class="executive-project-top"><div><span class="executive-eyebrow">{{ r.status }}</span><h3>{{ r.project }}</h3><p>{{ r.manager }}</p></div><strong>{{ r.progress }}%</strong></div>
+      <div class="executive-progress"><span style="--bar-width: {{ r.progress }}%"></span></div>
+      <div class="executive-meta-grid"><div><span>Start</span><strong>{{ r.start_date.strftime('%b %d, %Y') if r.start_date else '—' }}</strong></div><div><span>Target</span><strong>{{ r.target_date.strftime('%b %d, %Y') if r.target_date else '—' }}</strong></div><div><span>Tasks</span><strong>{{ r.done }} / {{ r.total_tasks }}</strong></div><div><span>Next Deadline</span><strong>{{ r.next_deadline.strftime('%b %d, %Y') if r.next_deadline else '—' }}</strong></div></div>
+      <div class="executive-card-footer"><span>{{ r.open_milestones }} open milestone{{ '' if r.open_milestones == 1 else 's' }}</span><span class="executive-status-dot executive-status-{{ r.status|lower|replace(' ','-') }}">{{ r.status }}</span></div>
+    </article>
+    {% else %}<div class="empty-state">No projects match the selected filters.</div>{% endfor %}
+  </div>
 </section>
 {% endblock %}

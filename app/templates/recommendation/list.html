@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block page_title %}{% if own %}My Learning{% else %}Team Learning{% endif %}{% endblock %}
-{% block page_subtitle %}{% if own %}Track learning activities recommended from your active competency gaps{% else %}Monitor competency-based learning recommendations and progress across the team{% endif %}{% endblock %}
+{% block page_subtitle %}{% if no_active_project and own %}Build your skills while you have no active project assignment{% elif own %}Track learning activities recommended from your active competency gaps{% else %}Monitor competency-based learning recommendations and progress across the team{% endif %}{% endblock %}
 {% block content %}
 {% if current_user.role in ('admin','manager') %}
 <section class="learning-view-nav">
@@ -14,7 +14,7 @@
 {% endif %}
 
 <section class="module-toolbar learning-toolbar">
-  <div class="module-info-banner"><span>i</span><p>{% if own %}Your recommendations refresh automatically from active project competency gaps when My Learning opens. Required skills without an assessment can still receive learning recommendations; proficiency changes only after reassessment.{% else %}Team recommendations are generated from active project competency gaps, including required skills that still need assessment. Managers can refresh team recommendations and monitor progress, while each employee controls the status of their own learning activities.{% endif %}</p></div>
+  <div class="module-info-banner"><span>i</span><p>{% if no_active_project and own %}You currently have no active project assignment. These recommendations use your recorded competencies to suggest learning resources that can help strengthen your skills while you are available for development.{% elif own %}Your recommendations refresh automatically from active project competency gaps when My Learning opens. Required skills without an assessment can still receive learning recommendations; proficiency changes only after reassessment.{% else %}Team recommendations are generated from active project competency gaps, including required skills that still need assessment. Managers can refresh team recommendations and monitor progress, while each employee controls the status of their own learning activities.{% endif %}</p></div>
   <form id="recommendationEngineForm" method="POST" action="{{ url_for('recommendation.generate') }}">
     <input type="hidden" name="scope" value="{{ 'my' if own else 'team' }}">
     <button id="recommendationEngineButton" class="btn" type="submit"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66"/><path d="M20 4v7h-7"/></svg><span>{% if own %}Refresh My Recommendations{% else %}Refresh Team Recommendations{% endif %}</span></button>
@@ -85,7 +85,7 @@
     </div>
   </article>
   {% else %}
-  <div class="empty-state learning-empty">{% if own %}No active learning recommendations are available for your current competency gaps.{% else %}No team learning recommendations are available. Run the recommendation engine after competency assessments and project requirements are recorded.{% endif %}</div>
+  <div class="empty-state learning-empty">{% if no_active_project and own %}No learning recommendations are available yet. Record competency assessments to receive development recommendations while you are not assigned to an active project.{% elif own %}No active learning recommendations are available for your current competency gaps.{% else %}No team learning recommendations are available. Run the recommendation engine after competency assessments and project requirements are recorded.{% endif %}</div>
   {% endfor %}
 </section>
 

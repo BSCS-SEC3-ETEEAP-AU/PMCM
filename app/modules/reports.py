@@ -14,6 +14,7 @@ from flask_login import current_user
 
 from ..competency_rules import active_project_requirements
 from ..decorators import manager_required
+from ..report_pdf import render_pdf
 from ..models import (
     db, Project, ProjectMember, Task, Milestone, Employee, Skill,
     CompetencyAssessment, LearningRecommendation, ReportLog, User,
@@ -201,6 +202,11 @@ def project_status():
     }
     filters = _report_query_params()
 
+    if request.args.get("export") == "pdf":
+        _log("Project Status Report PDF", filters)
+        pdf = render_pdf("project_status", summary=summary, rows=rows, filters=filters)
+        return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition": f'attachment; filename="project_status_report_{date.today().isoformat()}.pdf"'})
+
     if request.args.get("export") == "csv":
         _log("Project Status Report CSV", filters)
         return _csv_response(
@@ -312,6 +318,11 @@ def competency_report():
     teams = sorted({employee.team for employee in all_employees if employee.team})
     filters = _report_query_params()
 
+    if request.args.get("export") == "pdf":
+        _log("Competency Report PDF", filters)
+        pdf = render_pdf("competency", summary=summary, rows=rows, filters=filters)
+        return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition": f'attachment; filename="competency_report_{date.today().isoformat()}.pdf"'})
+
     if request.args.get("export") == "csv":
         _log("Competency Report CSV", filters)
         return _csv_response(
@@ -396,6 +407,11 @@ def learning_progress():
     }
     teams = sorted({employee.team for employee in employees if employee.team})
     filters = _report_query_params()
+
+    if request.args.get("export") == "pdf":
+        _log("Learning Progress Report PDF", filters)
+        pdf = render_pdf("learning_progress", summary=summary, rows=rows, filters=filters)
+        return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition": f'attachment; filename="learning_progress_report_{date.today().isoformat()}.pdf"'})
 
     if request.args.get("export") == "csv":
         _log("Learning Progress Report CSV", filters)
@@ -605,6 +621,11 @@ def delivery_performance():
         row["bar_pct"] = round(100 * (row["delivery_days"] or 0) / max_project_days, 1)
 
     filters = _report_query_params()
+    if request.args.get("export") == "pdf":
+        _log("Delivery Performance PDF", filters)
+        pdf = render_pdf("delivery_performance", summary=summary, rows=employee_rows, filters=filters, completed_projects=completed_projects)
+        return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition": f'attachment; filename="delivery_performance_{date.today().isoformat()}.pdf"'})
+
     if request.args.get("export") == "csv":
         _log("Delivery Performance CSV", filters)
         return _csv_response(
@@ -684,6 +705,11 @@ def workforce_summary():
         "gaps": sum(row["gaps"] for row in rows),
     }
     filters = _report_query_params()
+
+    if request.args.get("export") == "pdf":
+        _log("Workforce Summary PDF", filters)
+        pdf = render_pdf("workforce", summary=summary, rows=rows, filters=filters)
+        return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition": f'attachment; filename="workforce_summary_{date.today().isoformat()}.pdf"'})
 
     if request.args.get("export") == "csv":
         _log("Workforce Summary CSV", filters)

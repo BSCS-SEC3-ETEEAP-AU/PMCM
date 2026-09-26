@@ -10,25 +10,24 @@
     <label><span>Search</span><input type="search" name="q" value="{{ search }}" placeholder="Search team..."></label>
     <label><span>Team</span><select name="team"><option value="">All Teams</option>{% for t in teams %}<option value="{{ t }}" {% if selected_team==t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
   </div>
-  <div class="report-filter-actions"><a class="btn secondary" href="{{ url_for('reports.workforce_summary') }}">Clear</a><button class="btn secondary" type="submit" name="export" value="csv">Export CSV</button><button class="btn primary" type="submit">Apply Filters</button></div>
+  <div class="report-filter-actions"><a class="btn secondary" href="{{ url_for('reports.workforce_summary') }}">Clear</a><button class="btn primary" type="submit" name="export" value="pdf">Download PDF</button><button class="btn secondary" type="submit" name="export" value="csv">Export CSV</button><button class="btn primary" type="submit">Apply Filters</button></div>
 </form>
-
-<section class="module-kpi-row report-detail-kpis">
-  <div class="module-kpi-card mk-blue"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.8 18c.6-3.1 2.3-4.7 5.2-4.7s4.6 1.6 5.2 4.7"/><circle cx="16.5" cy="9" r="2.2"/><path d="M15.2 13.8c2.7-.3 4.5 1.1 5 4.2"/></svg></span><div><span class="module-kpi-label">Teams</span><strong>{{ summary.teams }}</strong><small>Included teams</small></div></div>
-  <div class="module-kpi-card mk-green"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="3"/><path d="M5.5 19c.8-3.8 3-5.7 6.5-5.7s5.7 1.9 6.5 5.7"/></svg></span><div><span class="module-kpi-label">Members</span><strong>{{ summary.members }}</strong><small>Employees represented</small></div></div>
-  <div class="module-kpi-card mk-violet"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="m15 9 5-5"/><path d="M17 4h3v3"/></svg></span><div><span class="module-kpi-label">Requirements</span><strong>{{ summary.requirements }}</strong><small>Active project targets</small></div></div>
-  <div class="module-kpi-card mk-amber"><span class="module-kpi-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4 3.5 19h17L12 4Z"/><path d="M12 9v4"/><path d="M12 16.5h.01"/></svg></span><div><span class="module-kpi-label">Open Gaps</span><strong>{{ summary.gaps }}</strong><small>Development needs</small></div></div>
-</section>
-
-<section class="module-panel report-table-panel">
-  <div class="module-panel-head"><div><h2>Team Readiness</h2><p>Summarized workforce information for project monitoring and development planning</p></div></div>
-  <div class="table-scroll"><table class="data-table report-data-table workforce-report-table">
-    <thead><tr><th>Team</th><th>Members</th><th>Projects Represented</th><th>Active Skill Requirements</th><th>Coverage</th><th>Open Gaps</th><th>Learning In Progress</th><th>Learning Completed</th></tr></thead>
-    <tbody>{% for r in rows %}<tr>
-      <td><strong>{{ r.team }}</strong></td><td>{{ r.members }}</td><td>{{ r.projects }}</td><td>{{ r.requirements }}</td>
-      <td><div class="report-progress-cell"><div class="coverage-track"><span class="u-dynamic-width" style="--dynamic-width: {{ r.coverage }}%"></span></div><strong>{{ r.coverage }}%</strong></div></td>
-      <td>{{ r.gaps }}</td><td>{{ r.in_progress }}</td><td>{{ r.completed }}</td>
-    </tr>{% else %}<tr><td colspan="8"><div class="empty-state">No workforce data match the selected filters.</div></td></tr>{% endfor %}</tbody>
-  </table></div>
+{% from "reports/_executive_macros.html" import kpis, section, bar %}
+<section class="executive-report-body">
+  {{ section('Workforce Snapshot', 'A management view of team capacity, project requirements, competency coverage and learning activity.') }}
+  {{ kpis([
+    {'label':'Teams','value':summary.teams,'note':'Included teams','accent':'blue'},
+    {'label':'Members','value':summary.members,'note':'Employees represented','accent':'green'},
+    {'label':'Requirements','value':summary.requirements,'note':'Active project targets','accent':'violet'},
+    {'label':'Open Gaps','value':summary.gaps,'note':'Development needs','accent':'amber'}
+  ]) }}
+  {{ section('Team Readiness', 'Coverage and development needs are shown as management cards; Export CSV remains available for tabular analysis.') }}
+  <div class="executive-team-grid">
+    {% for r in rows %}<article class="executive-team-card">
+      <div class="executive-card-heading"><div><span class="executive-eyebrow">Team</span><h3>{{ r.team }}</h3><p>{{ r.members }} members · {{ r.projects }} projects represented</p></div><strong>{{ r.coverage }}%</strong></div>
+      <div class="executive-progress"><span style="--bar-width: {{ r.coverage }}%"></span></div>
+      <div class="executive-stat-grid"><div><span>Requirements</span><strong>{{ r.requirements }}</strong></div><div><span>Open Gaps</span><strong>{{ r.gaps }}</strong></div><div><span>Learning In Progress</span><strong>{{ r.in_progress }}</strong></div><div><span>Learning Completed</span><strong>{{ r.completed }}</strong></div></div>
+    </article>{% else %}<div class="empty-state">No workforce data match the selected filters.</div>{% endfor %}
+  </div>
 </section>
 {% endblock %}

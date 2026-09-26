@@ -1,7 +1,7 @@
 """Main / landing / dashboard routes."""
 from datetime import date
 
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, redirect, url_for
 from flask_login import login_required, current_user
 
 from ..models import Project, Task, Employee, CompetencyAssessment, Milestone, ProjectMember
@@ -45,6 +45,22 @@ def dashboard():
                 pm.project_id
                 for pm in ProjectMember.query.filter_by(employee_id=employee.id).all()
             ]
+
+            # Employees without an active project start in My Learning so the
+            # landing experience can focus on competency development while
+            # they are not assigned to project work.
+            has_active_project = (
+                ProjectMember.query
+                .join(Project, Project.id == ProjectMember.project_id)
+                .filter(
+                    ProjectMember.employee_id == employee.id,
+                    Project.status == "Active",
+                )
+                .first()
+                is not None
+            )
+            if not has_active_project:
+                return redirect(url_for("recommendation.my_recommendations", view="my"))
 
     # ----- Shared datasets, scoped by role -----
     active_projects_query = Project.query.filter_by(status="Active")
